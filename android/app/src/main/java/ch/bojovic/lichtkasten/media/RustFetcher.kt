@@ -30,12 +30,20 @@ import okio.Path.Companion.toOkioPath
 
 /**
  * A request Coil routes to the Rust core: TIFF and RAW, which Android
- * cannot decode. [maxEdge] is part of the identity so a thumbnail and a
- * screen-sized view are two cache entries.
+ * cannot decode. [sourceEdge] is the long edge Rust decodes to and the
+ * JPEG on disk has; [displayEdge] is what the cell needs. The grid asks
+ * for one 1024 px source per picture at every zoom level and lets Coil
+ * sample the file down, so Rust runs once per picture; the viewer asks
+ * for source == display.
  */
-data class RustRequest(val item: MediaItem, val maxEdge: Int) {
-    val cacheKey: String get() = "rust:${item.cacheKey}:$maxEdge"
+data class RustRequest(val item: MediaItem, val sourceEdge: Int, val displayEdge: Int = sourceEdge) {
+    val cacheKey: String get() = "rust:${item.cacheKey}:$sourceEdge:$displayEdge"
     val uri: Uri get() = item.uri
+
+    companion object {
+        /** Long edge of the one cached rendition the grid uses. */
+        const val THUMB_SOURCE = 1024
+    }
 }
 
 class RustKeyer : Keyer<RustRequest> {
@@ -53,18 +61,27 @@ class RustFetcher(
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult? = withContext(Dispatchers.IO) {
-        val cached = RustThumbCache.fileFor(context, request.item, request.maxEdge)
+        val cached = RustThumbCache.fileFor(context, request.item, request.sourceEdge)
         if (cached.isFile && cached.length() > 0) {
-            return@withContext SourceFetchResult(
-                source = ImageSource(file = cached.toOkioPath(), fileSystem = FileSystem.SYSTEM),
-                mimeType = "image/jpeg",
-                dataSource = DataSource.DISK,
-            )
+            return@withContext fromFile(cached)
         }
         val bitmap = decodeThroughRust() ?: return@withContext null
-        RustThumbCache.store(cached, bitmap)
-        ImageFetchResult(image = bitmap.asImage(), isSampled = true, dataSource = DataSource.DISK)
+        val stored = RustThumbCache.store(cached, bitmap)
+        if (stored && request.displayEdge < request.sourceEdge) {
+            // Let Coil's decoder sample the JPEG down to the cell; the full
+            // 1024 px bitmap would be four times the memory of a 512 px cell.
+            bitmap.recycle()
+            fromFile(cached)
+        } else {
+            ImageFetchResult(image = bitmap.asImage(), isSampled = true, dataSource = DataSource.DISK)
+        }
     }
+
+    private fun fromFile(file: File): FetchResult = SourceFetchResult(
+        source = ImageSource(file = file.toOkioPath(), fileSystem = FileSystem.SYSTEM),
+        mimeType = "image/jpeg",
+        dataSource = DataSource.DISK,
+    )
 
     private suspend fun decodeThroughRust(): Bitmap? {
         val fd = try {
@@ -80,7 +97,7 @@ class RustFetcher(
         // Rust owns `fd` from here and closes it, success or error.
         val rgba = try {
             decodeSlots.withPermit {
-                decodeImage(fd, request.item.displayName, request.maxEdge.toUInt())
+                decodeImage(fd, request.item.displayName, request.sourceEdge.toUInt())
             }
         } catch (e: DecodeException) {
             Logs.file { "rust decode failed for ${request.item.displayName}: ${e.message}" }
@@ -120,7 +137,9 @@ class RustFetcher(
  * picture can be removed by prefix when the picture is deleted.
  */
 object RustThumbCache {
-    private const val DIR = "rust-thumbs"
+    private const val DIR = "thumbs"
+    /** 0.1.0 kept 512 px files under this name; removed on first start. */
+    private const val LEGACY_DIR = "rust-thumbs"
     private const val MAX_BYTES = 200L * 1024 * 1024
 
     fun dir(context: Context): File = File(context.cacheDir, DIR)
@@ -133,16 +152,18 @@ object RustThumbCache {
         return digest.joinToString("") { "%02x".format(it) }
     }
 
-    fun store(target: File, bitmap: Bitmap) {
-        try {
+    /** True when [target] now holds the JPEG. */
+    fun store(target: File, bitmap: Bitmap): Boolean {
+        return try {
             target.parentFile?.mkdirs()
             val tmp = File(target.path + ".part")
-            FileOutputStream(tmp).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 88, out)
+            val ok = FileOutputStream(tmp).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
             }
-            if (!tmp.renameTo(target)) tmp.delete()
+            if (ok && tmp.renameTo(target)) true else { tmp.delete(); false }
         } catch (e: Exception) {
             Logs.w("cache write skipped", e)
+            false
         }
     }
 
@@ -157,6 +178,7 @@ object RustThumbCache {
 
     /** Oldest first until the directory is under [MAX_BYTES]. */
     fun trim(context: Context) {
+        File(context.cacheDir, LEGACY_DIR).deleteRecursively()
         val files = dir(context).listFiles() ?: return
         var total = files.sumOf { it.length() }
         if (total <= MAX_BYTES) return

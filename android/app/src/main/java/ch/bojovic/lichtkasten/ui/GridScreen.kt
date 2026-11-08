@@ -48,6 +48,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import ch.bojovic.lichtkasten.LibraryState
@@ -59,7 +61,23 @@ import ch.bojovic.lichtkasten.media.RustRequest
 import ch.bojovic.lichtkasten.media.ThumbRequest
 import coil3.compose.AsyncImage
 
-private const val THUMB_PX = 512
+/**
+ * Thumbnail size tiers. Requests are rounded up to one of these so a pinch
+ * through intermediate cell sizes does not reload every cell; the top tier
+ * is the Rust source size, so nothing is ever upscaled.
+ */
+internal fun thumbTier(cellPx: Int): Int = when {
+    cellPx <= 256 -> 256
+    cellPx <= 512 -> 512
+    else -> RustRequest.THUMB_SOURCE
+}
+
+/** Width of one adaptive cell in px: the screen divided into as many `minPx` columns as fit. */
+internal fun adaptiveCellPx(screenWidthPx: Int, minPx: Int): Int {
+    if (minPx <= 0 || screenWidthPx <= 0) return screenWidthPx.coerceAtLeast(0)
+    val columns = (screenWidthPx / minPx).coerceAtLeast(1)
+    return screenWidthPx / columns
+}
 
 @Composable
 private fun OverflowMenu(onLicenses: () -> Unit) {
@@ -147,6 +165,11 @@ fun GridScreen(
                 }
                 else -> {
                     val cellDp = state.cellDp
+                    val density = LocalDensity.current
+                    val screenWidthPx = LocalWindowInfo.current.containerSize.width
+                    val thumbPx = remember(cellDp, screenWidthPx, density) {
+                        thumbTier(adaptiveCellPx(screenWidthPx, with(density) { cellDp.dp.roundToPx() }))
+                    }
                     LazyVerticalGrid(
                         state = gridState,
                         columns = GridCells.Adaptive(minSize = cellDp.dp),
@@ -163,6 +186,7 @@ fun GridScreen(
                         ) { index, item ->
                             GridCell(
                                 item = item,
+                                thumbPx = thumbPx,
                                 selected = item.id in selection.ids,
                                 selecting = selection.active,
                                 onClick = { if (selection.active) vm.toggle(item) else vm.openViewer(index) },
@@ -205,13 +229,14 @@ private fun PartialAccessBanner(onMore: () -> Unit) {
 @Composable
 private fun GridCell(
     item: MediaItem,
+    thumbPx: Int,
     selected: Boolean,
     selecting: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
-    val model = remember(item.cacheKey) {
-        if (item.needsRust) RustRequest(item, THUMB_PX) else ThumbRequest(item, THUMB_PX)
+    val model = remember(item.cacheKey, thumbPx) {
+        if (item.needsRust) RustRequest(item, RustRequest.THUMB_SOURCE, thumbPx) else ThumbRequest(item, thumbPx)
     }
     Box(
         modifier = Modifier
