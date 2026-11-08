@@ -4,15 +4,18 @@ import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -95,6 +98,12 @@ fun App(
         )
     }
 
+    // The grid's scroll state lives here, not in GridScreen: the grid leaves
+    // the composition while the viewer or the licenses are shown, and must
+    // come back where it was. Saveable, so it also survives process death.
+    val gridState = rememberSaveable(saver = LazyGridState.Saver) { LazyGridState() }
+    ReturnToViewedItem(state.viewerIndex, gridState)
+
     when {
         showLicenses -> {
             BackHandler { showLicenses = false }
@@ -109,7 +118,7 @@ fun App(
         }
         else -> {
             BackHandler(enabled = state.selection.active) { vm.exitSelection() }
-            GridScreen(state = state, vm = vm, actions = actions, snackbar = snackbar)
+            GridScreen(state = state, vm = vm, actions = actions, snackbar = snackbar, gridState = gridState)
         }
     }
 
@@ -132,6 +141,33 @@ fun App(
                 TextButton(onClick = { shareCandidates = null }) { Text(stringResource(R.string.cancel)) }
             },
         )
+    }
+}
+
+/**
+ * Keeps the grid in step with the viewer. When the viewer opens, remember
+ * which cells were on screen; when it closes, leave the grid alone if the
+ * last viewed picture is among them, otherwise scroll it into view (the
+ * user swiped on in the viewer and expects to land there).
+ */
+@Composable
+private fun ReturnToViewedItem(viewerIndex: Int?, gridState: LazyGridState) {
+    var firstVisibleOnOpen by rememberSaveable { mutableStateOf(-1) }
+    var lastVisibleOnOpen by rememberSaveable { mutableStateOf(-1) }
+    var lastViewed by rememberSaveable { mutableStateOf(-1) }
+    LaunchedEffect(viewerIndex) {
+        if (viewerIndex != null) {
+            if (lastViewed < 0) {
+                val info = gridState.layoutInfo.visibleItemsInfo
+                firstVisibleOnOpen = info.firstOrNull()?.index ?: -1
+                lastVisibleOnOpen = info.lastOrNull()?.index ?: -1
+            }
+            lastViewed = viewerIndex
+        } else if (lastViewed >= 0) {
+            val target = lastViewed
+            lastViewed = -1
+            if (target !in firstVisibleOnOpen..lastVisibleOnOpen) gridState.scrollToItem(target)
+        }
     }
 }
 

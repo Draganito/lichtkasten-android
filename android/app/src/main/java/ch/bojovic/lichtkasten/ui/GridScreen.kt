@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -87,9 +87,9 @@ fun GridScreen(
     vm: LibraryViewModel,
     actions: ScreenActions,
     snackbar: SnackbarHostState,
+    gridState: LazyGridState,
 ) {
     val selection = state.selection
-    val gridState = rememberLazyGridState()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
