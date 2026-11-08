@@ -41,6 +41,10 @@ which also provides the Rust core this app uses for TIFF, RAW and metadata.
   deleted.
 - Release builds never write a file name, URI or exception message to
   logcat (`Logs.kt`); debug builds do.
+- The window is `FLAG_SECURE`: the system keeps no Recents snapshot of it,
+  and screenshots, screen recording and casting of the app are blocked.
+  That also means you cannot screenshot the viewer; the trade-off is
+  intentional.
 - The Rust side never panics across the boundary: every decoder runs under
   size limits (50 MP, 256 MB allocation, 200 MB file) and `catch_unwind`;
   the only `unsafe` is taking ownership of the file descriptor Kotlin hands over.
