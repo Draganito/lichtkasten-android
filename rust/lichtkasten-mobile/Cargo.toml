@@ -3,7 +3,7 @@ name = "lichtkasten-mobile"
 # The app's version; android/app/build.gradle.kts reads it from here.
 version = "0.1.0"
 edition = "2024"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 authors = ["Dragan Bojovic"]
 description = "Lichtkasten core for Android: TIFF decoding, embedded RAW previews and EXIF/IPTC/XMP over a file descriptor, via UniFFI"
 publish = false

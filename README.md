@@ -77,7 +77,8 @@ signing key into the `KEYSTORE_*` secrets, otherwise the debug key is used.
 
 ## License
 
-MIT or Apache-2.0, at your option.
+MIT, see [LICENSE](LICENSE). The shared Rust core in the desktop repository
+is MIT OR Apache-2.0.
 
 ## Third-party software
 
