@@ -73,11 +73,9 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 version is the one in `rust/lichtkasten-mobile/Cargo.toml`.
 
 Release: `./gradlew assembleRelease` (minified, arm64-v8a only). A tag `v*`
-builds it on GitHub Actions and attaches the APK to a release, but only
-when the four `KEYSTORE_*` secrets are set. Without them the workflow
-stops instead of publishing an APK signed with the debug key. Locally,
-without `android/keystore.properties`, the debug key is still used so the
-APK can be tried.
+builds it on GitHub Actions and attaches the APK to a release. With the
+four `KEYSTORE_*` secrets it is signed with that key, otherwise with the
+debug key.
 
 ## License
 

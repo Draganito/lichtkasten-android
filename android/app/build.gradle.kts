@@ -113,8 +113,7 @@ android {
     //   storePassword=...
     //   keyAlias=...
     //   keyPassword=...
-    // Without it a local release APK is signed with the debug key, for trying
-    // it out. The release workflow refuses to publish such an APK.
+    // Without it the release APK is signed with the debug key.
     val releaseKey = rootProject.file("keystore.properties").takeIf { it.exists() }?.let { f ->
         Properties().also { p -> f.inputStream().use { p.load(it) } }
     }
