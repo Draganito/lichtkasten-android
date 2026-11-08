@@ -24,7 +24,7 @@ import ch.bojovic.lichtkasten.LibraryViewModel
 import ch.bojovic.lichtkasten.MediaAccess
 import ch.bojovic.lichtkasten.R
 import ch.bojovic.lichtkasten.media.MediaItem
-import ch.bojovic.lichtkasten.media.RustThumbCache
+import ch.bojovic.lichtkasten.media.ThumbCache
 import coil3.SingletonImageLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -63,7 +63,7 @@ fun App(
             vm.exitSelection()
             vm.reload()
             scope.launch {
-                withContext(Dispatchers.IO) { RustThumbCache.evict(context, deleted) }
+                withContext(Dispatchers.IO) { ThumbCache.evict(context, deleted) }
                 SingletonImageLoader.get(context).memoryCache?.clear()
                 snackbar.showSnackbar(context.getString(R.string.delete_done, deleted.size.coerceAtLeast(1)))
             }

@@ -1,6 +1,7 @@
 package ch.bojovic.lichtkasten
 
 import ch.bojovic.lichtkasten.media.RustRequest
+import ch.bojovic.lichtkasten.media.fittedSize
 import ch.bojovic.lichtkasten.ui.adaptiveCellPx
 import ch.bojovic.lichtkasten.ui.thumbTier
 import org.junit.Assert.assertEquals
@@ -26,6 +27,14 @@ class ThumbTierTest {
         // Degenerate inputs never divide by zero.
         assertEquals(1080, adaptiveCellPx(1080, 0))
         assertEquals(0, adaptiveCellPx(0, 100))
+    }
+
+    @Test
+    fun fittedSizeKeepsAspectAndNeverEnlarges() {
+        assertEquals(1024 to 683, fittedSize(4032, 2688, 1024))
+        assertEquals(683 to 1024, fittedSize(2688, 4032, 1024))
+        assertEquals(800 to 600, fittedSize(800, 600, 1024))
+        assertEquals(1 to 1, fittedSize(0, 4000, 1024))
     }
 
     @Test

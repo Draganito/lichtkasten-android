@@ -26,7 +26,9 @@ which also provides the Rust core this app uses for TIFF, RAW and metadata.
   (NEF, CR2, CR3, ARW, DNG, RAF, …) show the JPEG preview the camera embeds,
   which is full-size on most cameras; a RAW without one is reported as
   unsupported (no demosaicing on the phone, see *Third-party software*).
-  Everything else goes through Android's own hardware-backed decoders.
+  Everything else is decoded by the app itself (ImageDecoder, and a video
+  keyframe for clips) into its own thumbnail cache; the viewer uses
+  Android's decoders on the original file.
 - English and German, following the system language.
 
 ## Privacy and safety
@@ -36,9 +38,11 @@ which also provides the Rust core this app uses for TIFF, RAW and metadata.
   "selected photos only" is supported). Writes happen only through the
   system delete dialog.
 - Backup is off. The only stored state is the grid size (SharedPreferences)
-  and an app-private cache of thumbnails for TIFF/RAW, which the system may
-  clear at any time and which is purged for a picture the moment it is
-  deleted.
+  and an app-private cache of thumbnails for every photo and video
+  (`cacheDir/thumbs`, one 1024 px JPEG each, decoded by the app itself;
+  MediaStore's thumbnail cache is never read). The system may clear it at
+  any time, uninstalling removes it, and deleting a picture purges its
+  preview at once.
 - Release builds never write to logcat: Kotlin redacts what it logs, and
   the Rust library does not install its logger at all (`debug_assertions`).
   Debug builds log, including file names.

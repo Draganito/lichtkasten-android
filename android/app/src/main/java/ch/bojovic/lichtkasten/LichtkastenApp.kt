@@ -5,7 +5,7 @@ import android.os.StrictMode
 import ch.bojovic.lichtkasten.core.initLogging
 import ch.bojovic.lichtkasten.media.RustFetcher
 import ch.bojovic.lichtkasten.media.RustKeyer
-import ch.bojovic.lichtkasten.media.RustThumbCache
+import ch.bojovic.lichtkasten.media.ThumbCache
 import ch.bojovic.lichtkasten.media.ThumbFetcher
 import ch.bojovic.lichtkasten.media.ThumbKeyer
 import coil3.ImageLoader
@@ -43,7 +43,7 @@ class LichtkastenApp : Application(), SingletonImageLoader.Factory {
             )
             initLogging()
         }
-        appScope.launch { RustThumbCache.trim(this@LichtkastenApp) }
+        appScope.launch { ThumbCache.trim(this@LichtkastenApp) }
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =

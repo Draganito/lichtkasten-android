@@ -1,7 +1,9 @@
 package ch.bojovic.lichtkasten.media
 
 import android.content.Context
-import android.util.Size
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.media.MediaMetadataRetriever
 import ch.bojovic.lichtkasten.Logs
 import coil3.ImageLoader
 import coil3.asImage
@@ -13,22 +15,27 @@ import coil3.fetch.ImageFetchResult
 import coil3.fetch.SourceFetchResult
 import coil3.key.Keyer
 import coil3.request.Options
-import java.io.FileNotFoundException
-import java.io.IOException
+import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okio.FileSystem
-import okio.buffer
-import okio.source
+import okio.Path.Companion.toOkioPath
 
 /**
- * Grid thumbnail for everything Android decodes itself. MediaStore keeps
- * its own thumbnails for photos and videos and hands them over in a few
- * milliseconds; only when it cannot (unusual container, provider hiccup)
- * do we stream the file to Coil's BitmapFactory path.
+ * Grid thumbnail for everything Android decodes itself. One 1024 px JPEG
+ * per file, produced here and stored in [ThumbCache]; Coil samples that
+ * file down to the cell. MediaStore's thumbnail cache is never read, so
+ * these previews exist only inside the app.
+ *
+ * [sourceEdge] is the long edge of the stored JPEG, [displayEdge] the cell.
  */
-data class ThumbRequest(val item: MediaItem, val sizePx: Int) {
-    val cacheKey: String get() = "thumb:${item.cacheKey}:$sizePx"
+data class ThumbRequest(val item: MediaItem, val sourceEdge: Int, val displayEdge: Int = sourceEdge) {
+    val cacheKey: String get() = "thumb:${item.cacheKey}:$sourceEdge:$displayEdge"
+
+    companion object {
+        const val SOURCE = ThumbCache.SOURCE_EDGE
+    }
 }
 
 class ThumbKeyer : Keyer<ThumbRequest> {
@@ -38,32 +45,63 @@ class ThumbKeyer : Keyer<ThumbRequest> {
 class ThumbFetcher(private val request: ThumbRequest, private val context: Context) : Fetcher {
 
     override suspend fun fetch(): FetchResult? = withContext(Dispatchers.IO) {
-        val resolver = context.contentResolver
-        try {
-            val bmp = resolver.loadThumbnail(request.item.uri, Size(request.sizePx, request.sizePx), null)
-            return@withContext ImageFetchResult(image = bmp.asImage(), isSampled = true, dataSource = DataSource.DISK)
-        } catch (e: FileNotFoundException) {
-            return@withContext null
-        } catch (e: SecurityException) {
-            return@withContext null
-        } catch (e: IOException) {
-            // No system thumbnail for this one; decode it ourselves below.
-        } catch (e: IllegalArgumentException) {
-            Logs.file { "loadThumbnail refused ${request.item.displayName}: ${e.message}" }
+        val cached = ThumbCache.fileFor(context, request.item, request.sourceEdge)
+        if (cached.isFile && cached.length() > 0) {
+            return@withContext fromFile(cached)
         }
-        val stream = try {
-            resolver.openInputStream(request.item.uri)
-        } catch (e: FileNotFoundException) {
-            null
-        } catch (e: SecurityException) {
-            null
-        } ?: return@withContext null
-        SourceFetchResult(
-            source = ImageSource(source = stream.source().buffer(), fileSystem = FileSystem.SYSTEM),
-            mimeType = request.item.mimeType,
-            dataSource = DataSource.DISK,
-        )
+        val bitmap = ThumbCache.slots.withPermit { decode() } ?: return@withContext null
+        val stored = ThumbCache.store(cached, bitmap)
+        if (stored && request.displayEdge < request.sourceEdge) {
+            bitmap.recycle()
+            fromFile(cached)
+        } else {
+            ImageFetchResult(image = bitmap.asImage(), isSampled = true, dataSource = DataSource.DISK)
+        }
     }
+
+    private fun decode(): Bitmap? = try {
+        if (request.item.isVideo) videoFrame() else stillImage()
+    } catch (e: ImageDecoder.DecodeException) {
+        Logs.file { "decode failed for ${request.item.displayName}: ${e.message}" }
+        null
+    } catch (e: SecurityException) {
+        Logs.file { "not allowed: ${request.item.displayName}" }
+        null
+    } catch (e: OutOfMemoryError) {
+        Logs.w("out of memory decoding a thumbnail")
+        null
+    } catch (e: RuntimeException) {
+        Logs.file { "decode failed for ${request.item.displayName}: ${e.message}" }
+        null
+    }
+
+    /** ImageDecoder applies the EXIF orientation and scales while decoding. */
+    private fun stillImage(): Bitmap? {
+        val source = ImageDecoder.createSource(context.contentResolver, request.item.uri)
+        return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            val (w, h) = fittedSize(info.size.width, info.size.height, request.sourceEdge)
+            decoder.setTargetSize(w, h)
+        }
+    }
+
+    /** A keyframe, scaled to fit the source edge. Rotation metadata is applied by the retriever. */
+    private fun videoFrame(): Bitmap? {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, request.item.uri)
+            val edge = request.sourceEdge
+            return retriever.getScaledFrameAtTime(-1, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, edge, edge)
+        } finally {
+            runCatching { retriever.release() }
+        }
+    }
+
+    private fun fromFile(file: File): FetchResult = SourceFetchResult(
+        source = ImageSource(file = file.toOkioPath(), fileSystem = FileSystem.SYSTEM),
+        mimeType = "image/jpeg",
+        dataSource = DataSource.DISK,
+    )
 
     class Factory(private val context: Context) : Fetcher.Factory<ThumbRequest> {
         override fun create(data: ThumbRequest, options: Options, imageLoader: ImageLoader): Fetcher =

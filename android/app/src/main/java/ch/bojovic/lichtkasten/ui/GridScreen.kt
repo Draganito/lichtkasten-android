@@ -236,7 +236,7 @@ private fun GridCell(
     onLongClick: () -> Unit,
 ) {
     val model = remember(item.cacheKey, thumbPx) {
-        if (item.needsRust) RustRequest(item, RustRequest.THUMB_SOURCE, thumbPx) else ThumbRequest(item, thumbPx)
+        if (item.needsRust) RustRequest(item, RustRequest.THUMB_SOURCE, thumbPx) else ThumbRequest(item, ThumbRequest.SOURCE, thumbPx)
     }
     Box(
         modifier = Modifier

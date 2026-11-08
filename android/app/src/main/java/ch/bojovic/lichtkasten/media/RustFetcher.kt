@@ -18,11 +18,8 @@ import coil3.key.Keyer
 import coil3.request.Options
 import java.io.File
 import java.io.FileNotFoundException
-import java.io.FileOutputStream
 import java.nio.ByteBuffer
-import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okio.FileSystem
@@ -40,9 +37,9 @@ data class RustRequest(val item: MediaItem, val sourceEdge: Int, val displayEdge
     val cacheKey: String get() = "rust:${item.cacheKey}:$sourceEdge:$displayEdge"
     val uri: Uri get() = item.uri
 
-    companion object {
+        companion object {
         /** Long edge of the one cached rendition the grid uses. */
-        const val THUMB_SOURCE = 1024
+        const val THUMB_SOURCE = ThumbCache.SOURCE_EDGE
     }
 }
 
@@ -61,12 +58,12 @@ class RustFetcher(
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult? = withContext(Dispatchers.IO) {
-        val cached = RustThumbCache.fileFor(context, request.item, request.sourceEdge)
+        val cached = ThumbCache.fileFor(context, request.item, request.sourceEdge)
         if (cached.isFile && cached.length() > 0) {
             return@withContext fromFile(cached)
         }
         val bitmap = decodeThroughRust() ?: return@withContext null
-        val stored = RustThumbCache.store(cached, bitmap)
+        val stored = ThumbCache.store(cached, bitmap)
         if (stored && request.displayEdge < request.sourceEdge) {
             // Let Coil's decoder sample the JPEG down to the cell; the full
             // 1024 px bitmap would be four times the memory of a 512 px cell.
@@ -96,7 +93,7 @@ class RustFetcher(
 
         // Rust owns `fd` from here and closes it, success or error.
         val rgba = try {
-            decodeSlots.withPermit {
+            ThumbCache.slots.withPermit {
                 decodeImage(fd, request.item.displayName, request.sourceEdge.toUInt())
             }
         } catch (e: DecodeException) {
@@ -122,70 +119,5 @@ class RustFetcher(
     class Factory(private val context: Context) : Fetcher.Factory<RustRequest> {
         override fun create(data: RustRequest, options: Options, imageLoader: ImageLoader): Fetcher =
             RustFetcher(data, context.applicationContext)
-    }
-
-    private companion object {
-        /** Rust decodes are CPU and memory heavy; three at a time is plenty. */
-        val decodeSlots = Semaphore(Runtime.getRuntime().availableProcessors().coerceIn(1, 3))
-    }
-}
-
-/**
- * JPEG copies of Rust-decoded images under `cacheDir/rust-thumbs`. The
- * system may wipe the directory at any time; every file is re-creatable.
- * Files are named `<sha1(item)>-<edge>.jpg`, so everything belonging to one
- * picture can be removed by prefix when the picture is deleted.
- */
-object RustThumbCache {
-    private const val DIR = "thumbs"
-    /** 0.1.0 kept 512 px files under this name; removed on first start. */
-    private const val LEGACY_DIR = "rust-thumbs"
-    private const val MAX_BYTES = 200L * 1024 * 1024
-
-    fun dir(context: Context): File = File(context.cacheDir, DIR)
-
-    fun fileFor(context: Context, item: MediaItem, maxEdge: Int): File =
-        File(dir(context), "${prefix(item)}-$maxEdge.jpg")
-
-    private fun prefix(item: MediaItem): String {
-        val digest = MessageDigest.getInstance("SHA-1").digest(item.cacheKey.toByteArray())
-        return digest.joinToString("") { "%02x".format(it) }
-    }
-
-    /** True when [target] now holds the JPEG. */
-    fun store(target: File, bitmap: Bitmap): Boolean {
-        return try {
-            target.parentFile?.mkdirs()
-            val tmp = File(target.path + ".part")
-            val ok = FileOutputStream(tmp).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-            }
-            if (ok && tmp.renameTo(target)) true else { tmp.delete(); false }
-        } catch (e: Exception) {
-            Logs.w("cache write skipped", e)
-            false
-        }
-    }
-
-    /** Remove every cached rendition of [items]; called after a successful delete. */
-    fun evict(context: Context, items: List<MediaItem>) {
-        if (items.isEmpty()) return
-        val prefixes = items.map { prefix(it) }.toHashSet()
-        dir(context).listFiles()?.forEach { f ->
-            if (f.name.substringBefore('-') in prefixes) f.delete()
-        }
-    }
-
-    /** Oldest first until the directory is under [MAX_BYTES]. */
-    fun trim(context: Context) {
-        File(context.cacheDir, LEGACY_DIR).deleteRecursively()
-        val files = dir(context).listFiles() ?: return
-        var total = files.sumOf { it.length() }
-        if (total <= MAX_BYTES) return
-        for (f in files.sortedBy { it.lastModified() }) {
-            if (total <= MAX_BYTES) break
-            val len = f.length()
-            if (f.delete()) total -= len
-        }
     }
 }
