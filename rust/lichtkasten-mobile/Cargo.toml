@@ -47,7 +47,9 @@ opt-level = 3
 lto = "fat"
 codegen-units = 1
 debug = false
-strip = "symbols"
+# Not "symbols": uniffi-bindgen reads its metadata from the symbol table.
+# AGP strips the library when packaging the APK.
+strip = "debuginfo"
 # Panics must become errors at the FFI boundary (catch_unwind), never aborts.
 panic = "unwind"
 
