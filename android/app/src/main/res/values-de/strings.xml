@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lichtkasten</string>
+
+    <string name="perm_title">Deine Fotos und Videos</string>
+    <string name="perm_body">Lichtkasten zeigt alle Fotos und Videos auf diesem Telefon in einem Strom. Es liest sie nur; nichts wird hochgeladen, es gibt kein Konto und keinen Netzwerkzugriff.</string>
+    <string name="perm_grant">Zugriff erlauben</string>
+    <string name="perm_denied">Der Zugriff wurde verweigert. Erlaube ihn in den Systemeinstellungen, um deine Bilder zu sehen.</string>
+    <string name="perm_open_settings">Einstellungen öffnen</string>
+    <string name="perm_partial">Nur ausgewählte Fotos werden gezeigt</string>
+    <string name="perm_partial_more">Mehr auswählen</string>
+
+    <string name="grid_empty">Keine Fotos oder Videos gefunden</string>
+    <string name="grid_loading">Bibliothek wird gelesen…</string>
+    <string name="select">Auswählen</string>
+    <string name="select_all">Alle</string>
+    <string name="select_none">Keine</string>
+    <string name="selected_count">%1$d ausgewählt</string>
+    <string name="cancel_selection">Auswahl beenden</string>
+    <string name="share">Teilen</string>
+    <string name="delete">Löschen</string>
+    <string name="info">Info</string>
+    <string name="back">Zurück</string>
+    <string name="select_first">Zuerst etwas auswählen</string>
+
+    <string name="share_question">%1$d Dateien teilen?</string>
+    <string name="share_question_one">Diese Datei teilen?</string>
+    <string name="share_confirm">Teilen</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="delete_failed">Löschen nicht möglich</string>
+    <string name="delete_done">%1$d gelöscht</string>
+
+    <string name="video_badge">Video</string>
+    <string name="load_failed">Konnte nicht geladen werden</string>
+    <string name="image_description">Foto %1$s</string>
+
+    <string name="info_title">Info</string>
+    <string name="info_file">Datei</string>
+    <string name="info_folder">Ordner</string>
+    <string name="info_size">Größe</string>
+    <string name="info_modified">Geändert</string>
+    <string name="info_taken">Aufnahmedatum</string>
+    <string name="info_pixels">Pixel</string>
+    <string name="info_format">Format</string>
+    <string name="info_duration">Dauer</string>
+    <string name="info_section_exif">EXIF</string>
+    <string name="info_section_iptc">IPTC</string>
+    <string name="info_section_xmp">XMP</string>
+    <string name="info_none">Keine Metadaten</string>
+
+    <string name="exif_DateTimeOriginal">Aufnahmedatum</string>
+    <string name="exif_CreateDate">Digitalisiert</string>
+    <string name="exif_ModifyDate">EXIF geändert</string>
+    <string name="exif_Make">Kamera-Hersteller</string>
+    <string name="exif_Model">Kamera</string>
+    <string name="exif_LensModel">Objektiv</string>
+    <string name="exif_LensMake">Objektiv-Hersteller</string>
+    <string name="exif_ExposureTime">Belichtung</string>
+    <string name="exif_FNumber">Blende</string>
+    <string name="exif_FocalLength">Brennweite</string>
+    <string name="exif_FocalLengthIn35mmFormat">Brennweite (KB)</string>
+    <string name="exif_ExposureCompensation">Belichtungskorrektur</string>
+    <string name="exif_Flash">Blitz</string>
+    <string name="exif_WhiteBalance">Weißabgleich</string>
+    <string name="exif_ColorSpace">Farbraum</string>
+    <string name="exif_Artist">Autor</string>
+    <string name="exif_ImageDescription">Beschreibung</string>
+    <string name="exif_Orientation">Ausrichtung</string>
+    <string name="exif_ExifImageWidth">EXIF-Breite</string>
+    <string name="exif_ExifImageHeight">EXIF-Höhe</string>
+    <string name="exif_UserComment">Kommentar</string>
+
+    <string name="iptc_ObjectName">Titel</string>
+    <string name="iptc_Keywords">Stichwort</string>
+    <string name="iptc_By_line">Autor</string>
+    <string name="iptc_City">Stadt</string>
+    <string name="iptc_Country_PrimaryLocationName">Land</string>
+    <string name="iptc_Headline">Überschrift</string>
+    <string name="iptc_CopyrightNotice">Copyright</string>
+    <string name="iptc_Caption_Abstract">Beschreibung</string>
+    <string name="iptc_DateCreated">Datum</string>
+    <string name="iptc_Source">Quelle</string>
+</resources>

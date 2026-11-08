@@ -1,0 +1,73 @@
+# Debug APK on every push: the Rust core for arm64 through cargo-ndk, the
+# UniFFI Kotlin bindings, the Kotlin unit tests. The release APK on the
+# releases page is android-release.yml, on a v* tag.
+#
+# lichtkasten-core comes from the desktop repository, checked out next to
+# this one at the commit in lichtkasten-core.ref.
+name: Android
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  NDK_VERSION: "27.3.13750724"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: lichtkasten-android
+      - name: Core commit
+        id: core
+        run: echo "sha=$(tr -d '[:space:]' < lichtkasten-android/lichtkasten-core.ref)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: Draganito/lichtkasten
+          ref: ${{ steps.core.outputs.sha }}
+          path: lichtkasten
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: lichtkasten-android/rust/lichtkasten-mobile
+      - name: cargo-ndk
+        run: command -v cargo-ndk >/dev/null || cargo install cargo-ndk --locked
+
+      - name: Rust tests (host)
+        working-directory: lichtkasten-android/rust/lichtkasten-mobile
+        run: cargo test
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-37.1 ndk;${{ env.NDK_VERSION }}"
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and test
+        working-directory: lichtkasten-android/android
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
+        run: ./gradlew --no-daemon assembleDebug testDebugUnitTest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lichtkasten-debug
+          path: lichtkasten-android/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

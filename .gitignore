@@ -1,0 +1,13 @@
+rust/lichtkasten-mobile/target/
+rust/lichtkasten-mobile/.cargo/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/keystore.properties
+*.jks
+*.keystore
+android/.idea/
+android/.kotlin/
+*.apk
+*.aab

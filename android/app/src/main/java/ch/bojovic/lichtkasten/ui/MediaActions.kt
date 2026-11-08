@@ -1,0 +1,75 @@
+package ch.bojovic.lichtkasten.ui
+
+import android.app.Activity
+import android.content.ContentResolver
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.MediaStore
+import android.util.Log
+import androidx.activity.compose.ManagedActivityResultLauncher
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.IntentSenderRequest
+import ch.bojovic.lichtkasten.R
+import ch.bojovic.lichtkasten.media.MediaItem
+
+/** Share and permanent delete. Both end in a system UI; nothing is silent. */
+object MediaActions {
+
+    fun share(context: Context, items: List<MediaItem>) {
+        if (items.isEmpty()) return
+        val uris = ArrayList<Uri>(items.map { it.uri })
+        val type = commonType(items)
+        val intent = if (uris.size == 1) {
+            Intent(Intent.ACTION_SEND).apply {
+                putExtra(Intent.EXTRA_STREAM, uris[0])
+                this.type = type
+            }
+        } else {
+            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                this.type = type
+            }
+        }
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val chooser = Intent.createChooser(intent, context.getString(R.string.share))
+        chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        try {
+            context.startActivity(chooser)
+        } catch (e: RuntimeException) {
+            Log.w("lichtkasten", "share failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Permanent delete through the system confirmation. The result arrives
+     * in [launcher]'s callback as [Activity.RESULT_OK]; MediaStore then
+     * notifies the observer and the grid reloads itself.
+     */
+    fun requestDelete(
+        resolver: ContentResolver,
+        items: List<MediaItem>,
+        launcher: ManagedActivityResultLauncher<IntentSenderRequest, ActivityResult>,
+    ): Boolean {
+        if (items.isEmpty()) return false
+        return try {
+            val pending = MediaStore.createDeleteRequest(resolver, items.map { it.uri })
+            launcher.launch(IntentSenderRequest.Builder(pending.intentSender).build())
+            true
+        } catch (e: RuntimeException) {
+            Log.w("lichtkasten", "delete request failed: ${e.message}")
+            false
+        }
+    }
+
+    private fun commonType(items: List<MediaItem>): String {
+        val allImages = items.all { !it.isVideo }
+        val allVideos = items.all { it.isVideo }
+        return when {
+            items.size == 1 -> items[0].mimeType
+            allImages -> "image/*"
+            allVideos -> "video/*"
+            else -> "*/*"
+        }
+    }
+}

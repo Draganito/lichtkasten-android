@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lichtkasten</string>
+
+    <!-- Permission screen -->
+    <string name="perm_title">Your photos and videos</string>
+    <string name="perm_body">Lichtkasten shows every photo and video on this phone in one stream. It only reads them; nothing is uploaded, there is no account and no network access.</string>
+    <string name="perm_grant">Allow access</string>
+    <string name="perm_denied">Access was denied. Allow it in the system settings to see your pictures.</string>
+    <string name="perm_open_settings">Open settings</string>
+    <string name="perm_partial">Only selected photos are shown</string>
+    <string name="perm_partial_more">Select more</string>
+
+    <!-- Grid -->
+    <string name="grid_empty">No photos or videos found</string>
+    <string name="grid_loading">Reading library…</string>
+    <string name="select">Select</string>
+    <string name="select_all">All</string>
+    <string name="select_none">None</string>
+    <string name="selected_count">%1$d selected</string>
+    <string name="cancel_selection">Cancel selection</string>
+    <string name="share">Share</string>
+    <string name="delete">Delete</string>
+    <string name="info">Info</string>
+    <string name="back">Back</string>
+    <string name="select_first">Select something first</string>
+
+    <!-- Dialogs -->
+    <string name="share_question">Share %1$d files?</string>
+    <string name="share_question_one">Share this file?</string>
+    <string name="share_confirm">Share</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete_failed">Could not delete</string>
+    <string name="delete_done">%1$d deleted</string>
+
+    <!-- Viewer -->
+    <string name="video_badge">Video</string>
+    <string name="load_failed">Could not load</string>
+    <string name="image_description">Photo %1$s</string>
+
+    <!-- Info sheet -->
+    <string name="info_title">Info</string>
+    <string name="info_file">File</string>
+    <string name="info_folder">Folder</string>
+    <string name="info_size">Size</string>
+    <string name="info_modified">Modified</string>
+    <string name="info_taken">Date taken</string>
+    <string name="info_pixels">Pixels</string>
+    <string name="info_format">Format</string>
+    <string name="info_duration">Duration</string>
+    <string name="info_section_exif">EXIF</string>
+    <string name="info_section_iptc">IPTC</string>
+    <string name="info_section_xmp">XMP</string>
+    <string name="info_none">No metadata</string>
+
+    <!-- EXIF keys -->
+    <string name="exif_DateTimeOriginal">Date taken</string>
+    <string name="exif_CreateDate">Digitized</string>
+    <string name="exif_ModifyDate">EXIF modified</string>
+    <string name="exif_Make">Camera make</string>
+    <string name="exif_Model">Camera</string>
+    <string name="exif_LensModel">Lens</string>
+    <string name="exif_LensMake">Lens make</string>
+    <string name="exif_ExposureTime">Exposure</string>
+    <string name="exif_FNumber">Aperture</string>
+    <string name="exif_FocalLength">Focal length</string>
+    <string name="exif_FocalLengthIn35mmFormat">Focal length (35mm)</string>
+    <string name="exif_ExposureCompensation">Exposure compensation</string>
+    <string name="exif_Flash">Flash</string>
+    <string name="exif_WhiteBalance">White balance</string>
+    <string name="exif_ColorSpace">Color space</string>
+    <string name="exif_Artist">Artist</string>
+    <string name="exif_ImageDescription">Description</string>
+    <string name="exif_Orientation">Orientation</string>
+    <string name="exif_ExifImageWidth">EXIF width</string>
+    <string name="exif_ExifImageHeight">EXIF height</string>
+    <string name="exif_UserComment">Comment</string>
+
+    <!-- IPTC keys -->
+    <string name="iptc_ObjectName">Title</string>
+    <string name="iptc_Keywords">Keyword</string>
+    <string name="iptc_By_line">Artist</string>
+    <string name="iptc_City">City</string>
+    <string name="iptc_Country_PrimaryLocationName">Country</string>
+    <string name="iptc_Headline">Headline</string>
+    <string name="iptc_CopyrightNotice">Copyright</string>
+    <string name="iptc_Caption_Abstract">Description</string>
+    <string name="iptc_DateCreated">Date</string>
+    <string name="iptc_Source">Source</string>
+</resources>

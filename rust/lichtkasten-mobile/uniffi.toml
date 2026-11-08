@@ -1,0 +1,4 @@
+[bindings.kotlin]
+package_name = "ch.bojovic.lichtkasten.core"
+cdylib_name = "lichtkasten_mobile"
+generate_immutable_records = true

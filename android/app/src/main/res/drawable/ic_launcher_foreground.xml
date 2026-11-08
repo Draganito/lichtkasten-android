@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The desktop icon (packaging/lichtkasten.svg, 128 viewBox) centred in
+     the 108 dp adaptive canvas: scale 0.6, offset 15.6. The outermost
+     rounded square of the SVG is the adaptive background colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.6"
+        android:scaleY="0.6"
+        android:translateX="15.6"
+        android:translateY="15.6">
+        <path android:fillColor="#2A2722"
+            android:pathData="M32,12 h64 a20,20 0 0 1 20,20 v64 a20,20 0 0 1 -20,20 h-64 a20,20 0 0 1 -20,-20 v-64 a20,20 0 0 1 20,-20 z" />
+        <path android:fillColor="#1A1712"
+            android:pathData="M34,20 h60 a14,14 0 0 1 14,14 v60 a14,14 0 0 1 -14,14 h-60 a14,14 0 0 1 -14,-14 v-60 a14,14 0 0 1 14,-14 z" />
+        <path android:fillColor="#3D3420"
+            android:pathData="M34,26 h60 a8,8 0 0 1 8,8 v60 a8,8 0 0 1 -8,8 h-60 a8,8 0 0 1 -8,-8 v-60 a8,8 0 0 1 8,-8 z" />
+        <path android:fillColor="#E8D5A3"
+            android:pathData="M36,30 h56 a6,6 0 0 1 6,6 v56 a6,6 0 0 1 -6,6 h-56 a6,6 0 0 1 -6,-6 v-56 a6,6 0 0 1 6,-6 z" />
+        <path android:fillColor="#F6EDD2"
+            android:pathData="M36,30 h56 a6,6 0 0 1 6,6 v12 a6,6 0 0 1 -6,6 h-56 a6,6 0 0 1 -6,-6 v-12 a6,6 0 0 1 6,-6 z" />
+        <path android:fillColor="#C9B27A" android:fillAlpha="0.45"
+            android:pathData="M36,78 h56 a6,6 0 0 1 6,6 v8 a6,6 0 0 1 -6,6 h-56 a6,6 0 0 1 -6,-6 v-8 a6,6 0 0 1 6,-6 z" />
+    </group>
+</vector>

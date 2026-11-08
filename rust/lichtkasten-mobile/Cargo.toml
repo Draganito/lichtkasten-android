@@ -1,0 +1,58 @@
+[package]
+name = "lichtkasten-mobile"
+# The app's version; android/app/build.gradle.kts reads it from here.
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+authors = ["Dragan Bojovic"]
+description = "Lichtkasten core for Android: TIFF and RAW decoding plus EXIF/IPTC/XMP over a file descriptor, via UniFFI"
+publish = false
+
+[lib]
+name = "lichtkasten_mobile"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+default = []
+# `uniffi-bindgen` binary (Kotlin code generation on the host).
+bindgen = ["uniffi/cli"]
+
+[dependencies]
+# The core lives in the desktop repository (Draganito/lichtkasten), checked
+# out next to this one: ../lichtkasten. CI checks it out at the commit in
+# lichtkasten-core.ref (repository root).
+lichtkasten-core = { path = "../../../lichtkasten/crates/lichtkasten-core" }
+uniffi = { version = "0.32" }
+thiserror = "2"
+libc = "0.2"
+
+# logcat through `log`.
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.15"
+log = "0.4"
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png", "tiff", "jpeg"] }
+tempfile = "3"
+
+[profile.release]
+opt-level = 3
+# Fat LTO and one codegen unit: smallest library at full speed (the
+# decoders are hot loops, so no opt-level "s").
+lto = "fat"
+codegen-units = 1
+debug = false
+strip = "symbols"
+# Panics must become errors at the FFI boundary (catch_unwind), never aborts.
+panic = "unwind"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
