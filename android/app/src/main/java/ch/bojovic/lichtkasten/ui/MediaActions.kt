@@ -1,6 +1,7 @@
 package ch.bojovic.lichtkasten.ui
 
 import android.app.Activity
+import android.content.ClipData
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
@@ -31,8 +32,13 @@ object MediaActions {
                 this.type = type
             }
         }
+        // ClipData is what the system reads when granting read access to
+        // several content:// URIs; EXTRA_STREAM alone does not scope the
+        // grant on every API level.
+        intent.clipData = clipOf(uris)
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         val chooser = Intent.createChooser(intent, context.getString(R.string.share))
+        chooser.clipData = intent.clipData
         chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         try {
             context.startActivity(chooser)
@@ -60,6 +66,12 @@ object MediaActions {
             Logs.w("delete request failed", e)
             false
         }
+    }
+
+    private fun clipOf(uris: List<Uri>): ClipData {
+        val clip = ClipData.newRawUri("", uris[0])
+        for (uri in uris.drop(1)) clip.addItem(ClipData.Item(uri))
+        return clip
     }
 
     private fun commonType(items: List<MediaItem>): String {

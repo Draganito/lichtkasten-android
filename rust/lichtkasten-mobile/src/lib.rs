@@ -83,10 +83,12 @@ pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
-/// Route Rust `log` output to logcat (tag `lichtkasten`). No-op elsewhere.
+/// Route Rust `log` output to logcat (tag `lichtkasten`), debug builds
+/// only. A release build never installs the logger, so nothing from this
+/// crate or its dependencies reaches logcat.
 #[uniffi::export]
 pub fn init_logging() {
-    #[cfg(target_os = "android")]
+    #[cfg(all(target_os = "android", debug_assertions))]
     {
         android_logger::init_once(
             android_logger::Config::default()

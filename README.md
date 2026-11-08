@@ -39,8 +39,9 @@ which also provides the Rust core this app uses for TIFF, RAW and metadata.
   and an app-private cache of thumbnails for TIFF/RAW, which the system may
   clear at any time and which is purged for a picture the moment it is
   deleted.
-- Release builds never write a file name, URI or exception message to
-  logcat (`Logs.kt`); debug builds do.
+- Release builds never write to logcat: Kotlin redacts what it logs, and
+  the Rust library does not install its logger at all (`debug_assertions`).
+  Debug builds log, including file names.
 - The window is `FLAG_SECURE`: the system keeps no Recents snapshot of it,
   and screenshots, screen recording and casting of the app are blocked.
   That also means you cannot screenshot the viewer; the trade-off is
@@ -72,8 +73,11 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 version is the one in `rust/lichtkasten-mobile/Cargo.toml`.
 
 Release: `./gradlew assembleRelease` (minified, arm64-v8a only). A tag `v*`
-builds it on GitHub Actions and attaches the APK to a release; put the
-signing key into the `KEYSTORE_*` secrets, otherwise the debug key is used.
+builds it on GitHub Actions and attaches the APK to a release, but only
+when the four `KEYSTORE_*` secrets are set. Without them the workflow
+stops instead of publishing an APK signed with the debug key. Locally,
+without `android/keystore.properties`, the debug key is still used so the
+APK can be tried.
 
 ## License
 

@@ -1,6 +1,6 @@
-# Release APK on a v* tag, attached to a GitHub release. Signed with the
-# release key when the four KEYSTORE_* secrets exist, with the debug key
-# otherwise (Android treats the two as different apps).
+# Release APK on a v* tag, attached to a GitHub release. Refuses to run
+# without the four KEYSTORE_* secrets: a published APK is never signed
+# with the debug key.
 name: Android release
 
 on:
@@ -52,16 +52,20 @@ jobs:
           packages: "platforms;android-37.1 ndk;${{ env.NDK_VERSION }}"
       - uses: gradle/actions/setup-gradle@v4
 
-      # `secrets` is not available in a step `if`; the value goes through env.
+      # `secrets` is not available in a step `if`; the values go through env.
       - name: Release key
-        if: env.KEYSTORE_BASE64 != ''
         working-directory: lichtkasten-android/android
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Set KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD. Refusing to publish an APK signed with the debug key."
+            exit 1
+          fi
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          umask 077
           {
             echo "storeFile=$RUNNER_TEMP/release.jks"
             echo "storePassword=$KEYSTORE_PASSWORD"
@@ -77,6 +81,10 @@ jobs:
           ./gradlew --no-daemon assembleRelease
           version="$(sed -n 's/^version = "\(.*\)"/\1/p' ../rust/lichtkasten-mobile/Cargo.toml | head -1)"
           cp app/build/outputs/apk/release/app-release.apk "lichtkasten-${version}.apk"
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f lichtkasten-android/android/keystore.properties "$RUNNER_TEMP/release.jks"
 
       - uses: actions/upload-artifact@v4
         with:

@@ -41,8 +41,8 @@ class LichtkastenApp : Application(), SingletonImageLoader.Factory {
             StrictMode.setVmPolicy(
                 StrictMode.VmPolicy.Builder().detectLeakedClosableObjects().detectLeakedSqlLiteObjects().penaltyLog().build(),
             )
+            initLogging()
         }
-        initLogging()
         appScope.launch { RustThumbCache.trim(this@LichtkastenApp) }
     }
 
