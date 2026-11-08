@@ -3,7 +3,7 @@ package ch.bojovic.lichtkasten.media
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
-import android.util.Log
+import ch.bojovic.lichtkasten.Logs
 import ch.bojovic.lichtkasten.core.DecodeException
 import ch.bojovic.lichtkasten.core.decodeImage
 import coil3.ImageLoader
@@ -53,7 +53,7 @@ class RustFetcher(
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult? = withContext(Dispatchers.IO) {
-        val cached = RustThumbCache.fileFor(context, request.cacheKey)
+        val cached = RustThumbCache.fileFor(context, request.item, request.maxEdge)
         if (cached.isFile && cached.length() > 0) {
             return@withContext SourceFetchResult(
                 source = ImageSource(file = cached.toOkioPath(), fileSystem = FileSystem.SYSTEM),
@@ -70,10 +70,10 @@ class RustFetcher(
         val fd = try {
             context.contentResolver.openFileDescriptor(request.uri, "r")?.detachFd()
         } catch (e: FileNotFoundException) {
-            Log.i(TAG, "gone: ${request.item.displayName}")
+            Logs.file { "gone: ${request.item.displayName}" }
             return null
         } catch (e: SecurityException) {
-            Log.i(TAG, "not allowed: ${request.item.displayName}")
+            Logs.file { "not allowed: ${request.item.displayName}" }
             return null
         } ?: return null
 
@@ -83,13 +83,13 @@ class RustFetcher(
                 decodeImage(fd, request.item.displayName, request.maxEdge.toUInt())
             }
         } catch (e: DecodeException) {
-            Log.i(TAG, "rust decode failed for ${request.item.displayName}: ${e.message}")
+            Logs.file { "rust decode failed for ${request.item.displayName}: ${e.message}" }
             return null
         }
         val w = rgba.width.toInt()
         val h = rgba.height.toInt()
         if (w <= 0 || h <= 0 || rgba.pixels.size != w * h * 4) {
-            Log.w(TAG, "rust returned inconsistent buffer for ${request.item.displayName}")
+            Logs.w("rust returned an inconsistent buffer")
             return null
         }
         return try {
@@ -97,7 +97,7 @@ class RustFetcher(
                 it.copyPixelsFromBuffer(ByteBuffer.wrap(rgba.pixels))
             }
         } catch (e: OutOfMemoryError) {
-            Log.w(TAG, "out of memory for ${w}x${h} ${request.item.displayName}")
+            Logs.w("out of memory for a ${w}x${h} bitmap")
             null
         }
     }
@@ -108,8 +108,6 @@ class RustFetcher(
     }
 
     private companion object {
-        const val TAG = "lichtkasten"
-
         /** Rust decodes are CPU and memory heavy; three at a time is plenty. */
         val decodeSlots = Semaphore(Runtime.getRuntime().availableProcessors().coerceIn(1, 3))
     }
@@ -118,6 +116,8 @@ class RustFetcher(
 /**
  * JPEG copies of Rust-decoded images under `cacheDir/rust-thumbs`. The
  * system may wipe the directory at any time; every file is re-creatable.
+ * Files are named `<sha1(item)>-<edge>.jpg`, so everything belonging to one
+ * picture can be removed by prefix when the picture is deleted.
  */
 object RustThumbCache {
     private const val DIR = "rust-thumbs"
@@ -125,10 +125,12 @@ object RustThumbCache {
 
     fun dir(context: Context): File = File(context.cacheDir, DIR)
 
-    fun fileFor(context: Context, key: String): File {
-        val digest = MessageDigest.getInstance("SHA-1").digest(key.toByteArray())
-        val name = digest.joinToString("") { "%02x".format(it) }
-        return File(dir(context), "$name.jpg")
+    fun fileFor(context: Context, item: MediaItem, maxEdge: Int): File =
+        File(dir(context), "${prefix(item)}-$maxEdge.jpg")
+
+    private fun prefix(item: MediaItem): String {
+        val digest = MessageDigest.getInstance("SHA-1").digest(item.cacheKey.toByteArray())
+        return digest.joinToString("") { "%02x".format(it) }
     }
 
     fun store(target: File, bitmap: Bitmap) {
@@ -140,7 +142,16 @@ object RustThumbCache {
             }
             if (!tmp.renameTo(target)) tmp.delete()
         } catch (e: Exception) {
-            Log.i("lichtkasten", "cache write skipped: ${e.message}")
+            Logs.w("cache write skipped", e)
+        }
+    }
+
+    /** Remove every cached rendition of [items]; called after a successful delete. */
+    fun evict(context: Context, items: List<MediaItem>) {
+        if (items.isEmpty()) return
+        val prefixes = items.map { prefix(it) }.toHashSet()
+        dir(context).listFiles()?.forEach { f ->
+            if (f.name.substringBefore('-') in prefixes) f.delete()
         }
     }
 

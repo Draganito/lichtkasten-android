@@ -8,7 +8,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
-import android.util.Log
+import ch.bojovic.lichtkasten.Logs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -73,12 +73,12 @@ class MediaStoreRepository(private val resolver: ContentResolver) {
                 }
             }
         } catch (e: SecurityException) {
-            Log.w(TAG, "MediaStore query refused: ${e.message}")
+            Logs.w("MediaStore query refused", e)
         } catch (e: IllegalArgumentException) {
-            Log.w(TAG, "MediaStore query failed: ${e.message}")
+            Logs.w("MediaStore query failed", e)
         } catch (e: RuntimeException) {
             // Provider crashed or died mid-cursor. Keep what we have.
-            Log.w(TAG, "MediaStore query aborted: ${e.message}")
+            Logs.w("MediaStore query aborted", e)
         }
         // Rows without DATE_TAKEN sort by the SQL order above only within
         // their column; one merged order by sortMillis is what the grid wants.
@@ -114,9 +114,5 @@ class MediaStoreRepository(private val resolver: ContentResolver) {
             durationMillis = if (c.isNull(11)) 0L else c.getLong(11),
             isVideo = isVideo,
         )
-    }
-
-    private companion object {
-        const val TAG = "lichtkasten"
     }
 }

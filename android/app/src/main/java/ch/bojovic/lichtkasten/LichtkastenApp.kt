@@ -11,7 +11,6 @@ import ch.bojovic.lichtkasten.media.ThumbKeyer
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
-import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.request.crossfade
 import coil3.video.VideoFrameDecoder
@@ -19,7 +18,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import okio.Path.Companion.toOkioPath
 
 class LichtkastenApp : Application(), SingletonImageLoader.Factory {
 
@@ -60,15 +58,11 @@ class LichtkastenApp : Application(), SingletonImageLoader.Factory {
             .memoryCache {
                 MemoryCache.Builder().maxSizePercent(context, 0.20).build()
             }
-            .diskCache {
-                // Coil's own cache holds video frames and nothing else of
-                // note: images come straight from MediaStore, Rust results
-                // have their own JPEG cache.
-                DiskCache.Builder()
-                    .directory(cacheDir.resolve("coil").toOkioPath())
-                    .maxSizeBytes(64L * 1024 * 1024)
-                    .build()
-            }
+            // No Coil disk cache: it is only ever written by network
+            // fetchers, and this app has none. Images come straight from
+            // MediaStore, Rust results have their own JPEG cache that is
+            // evicted when a picture is deleted.
+            .diskCache(null)
             .crossfade(false)
             .build()
 }

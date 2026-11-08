@@ -37,7 +37,10 @@ which also provides the Rust core this app uses for TIFF, RAW and metadata.
   system delete dialog.
 - Backup is off. The only stored state is the grid size (SharedPreferences)
   and an app-private cache of thumbnails for TIFF/RAW, which the system may
-  clear at any time.
+  clear at any time and which is purged for a picture the moment it is
+  deleted.
+- Release builds never write a file name, URI or exception message to
+  logcat (`Logs.kt`); debug builds do.
 - The Rust side never panics across the boundary: every decoder runs under
   size limits (50 MP, 256 MB allocation, 200 MB file) and `catch_unwind`;
   the only `unsafe` is taking ownership of the file descriptor Kotlin hands over.

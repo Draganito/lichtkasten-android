@@ -1,8 +1,8 @@
 package ch.bojovic.lichtkasten.media
 
 import android.content.Context
-import android.util.Log
 import android.util.Size
+import ch.bojovic.lichtkasten.Logs
 import coil3.ImageLoader
 import coil3.asImage
 import coil3.decode.DataSource
@@ -49,7 +49,7 @@ class ThumbFetcher(private val request: ThumbRequest, private val context: Conte
         } catch (e: IOException) {
             // No system thumbnail for this one; decode it ourselves below.
         } catch (e: IllegalArgumentException) {
-            Log.i(TAG, "loadThumbnail refused ${request.item.displayName}: ${e.message}")
+            Logs.file { "loadThumbnail refused ${request.item.displayName}: ${e.message}" }
         }
         val stream = try {
             resolver.openInputStream(request.item.uri)
@@ -68,9 +68,5 @@ class ThumbFetcher(private val request: ThumbRequest, private val context: Conte
     class Factory(private val context: Context) : Fetcher.Factory<ThumbRequest> {
         override fun create(data: ThumbRequest, options: Options, imageLoader: ImageLoader): Fetcher =
             ThumbFetcher(data, context.applicationContext)
-    }
-
-    private companion object {
-        const val TAG = "lichtkasten"
     }
 }

@@ -21,7 +21,11 @@ import ch.bojovic.lichtkasten.LibraryViewModel
 import ch.bojovic.lichtkasten.MediaAccess
 import ch.bojovic.lichtkasten.R
 import ch.bojovic.lichtkasten.media.MediaItem
+import ch.bojovic.lichtkasten.media.RustThumbCache
+import coil3.SingletonImageLoader
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Three screens, no navigation library: permission, grid, viewer. The
@@ -43,14 +47,23 @@ fun App(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { onPermissionsResult() }
 
+    // What the system delete dialog is currently asking about; needed when
+    // the result comes back, to drop their cached renditions as well.
+    var pendingDelete by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
+
     val deleteLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result ->
+        val deleted = pendingDelete
+        pendingDelete = emptyList()
         if (result.resultCode == Activity.RESULT_OK) {
-            val n = state.selection.count.takeIf { it > 0 } ?: 1
             vm.exitSelection()
             vm.reload()
-            scope.launch { snackbar.showSnackbar(context.getString(R.string.delete_done, n)) }
+            scope.launch {
+                withContext(Dispatchers.IO) { RustThumbCache.evict(context, deleted) }
+                SingletonImageLoader.get(context).memoryCache?.clear()
+                snackbar.showSnackbar(context.getString(R.string.delete_done, deleted.size.coerceAtLeast(1)))
+            }
         }
     }
 
@@ -69,8 +82,12 @@ fun App(
             delete = { items ->
                 if (items.isEmpty()) {
                     scope.launch { snackbar.showSnackbar(context.getString(R.string.select_first)) }
-                } else if (!MediaActions.requestDelete(context.contentResolver, items, deleteLauncher)) {
-                    scope.launch { snackbar.showSnackbar(context.getString(R.string.delete_failed)) }
+                } else {
+                    pendingDelete = items
+                    if (!MediaActions.requestDelete(context.contentResolver, items, deleteLauncher)) {
+                        pendingDelete = emptyList()
+                        scope.launch { snackbar.showSnackbar(context.getString(R.string.delete_failed)) }
+                    }
                 }
             },
             requestPermissions = { permissionLauncher.launch(mediaPermissions) },

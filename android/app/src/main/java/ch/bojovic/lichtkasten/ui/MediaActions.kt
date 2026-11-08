@@ -6,10 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.MediaStore
-import android.util.Log
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.IntentSenderRequest
+import ch.bojovic.lichtkasten.Logs
 import ch.bojovic.lichtkasten.R
 import ch.bojovic.lichtkasten.media.MediaItem
 
@@ -37,7 +37,7 @@ object MediaActions {
         try {
             context.startActivity(chooser)
         } catch (e: RuntimeException) {
-            Log.w("lichtkasten", "share failed: ${e.message}")
+            Logs.w("share failed", e)
         }
     }
 
@@ -57,7 +57,7 @@ object MediaActions {
             launcher.launch(IntentSenderRequest.Builder(pending.intentSender).build())
             true
         } catch (e: RuntimeException) {
-            Log.w("lichtkasten", "delete request failed: ${e.message}")
+            Logs.w("delete request failed", e)
             false
         }
     }
