@@ -96,10 +96,11 @@ pub fn init_logging() {
     }
 }
 
-/// Decode the image behind `fd` (TIFF, RAW, or any raster the core
-/// knows), apply the EXIF orientation and shrink it so that the long edge
-/// is at most `max_edge`. `name_hint` is the display name; its extension
-/// decides between the RAW and the raster path. Takes ownership of `fd`.
+/// Decode the image behind `fd` (TIFF, the embedded preview of a RAW, or
+/// any raster the core knows), apply the EXIF orientation and shrink it so
+/// that the long edge is at most `max_edge`. `name_hint` is the display
+/// name; its extension decides between the RAW and the raster path. Takes
+/// ownership of `fd`.
 #[uniffi::export]
 pub fn decode_image(fd: i32, name_hint: String, max_edge: u32) -> Result<RgbaImage, DecodeError> {
     let file = take_fd(fd)?;

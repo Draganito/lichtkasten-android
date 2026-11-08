@@ -5,7 +5,7 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 authors = ["Dragan Bojovic"]
-description = "Lichtkasten core for Android: TIFF and RAW decoding plus EXIF/IPTC/XMP over a file descriptor, via UniFFI"
+description = "Lichtkasten core for Android: TIFF decoding, embedded RAW previews and EXIF/IPTC/XMP over a file descriptor, via UniFFI"
 publish = false
 
 [lib]
@@ -26,7 +26,10 @@ bindgen = ["uniffi/cli"]
 # The core lives in the desktop repository (Draganito/lichtkasten), checked
 # out next to this one: ../lichtkasten. CI checks it out at the commit in
 # lichtkasten-core.ref (repository root).
-lichtkasten-core = { path = "../../../lichtkasten/crates/lichtkasten-core" }
+# Without the `rawler` feature (LGPL): RAW files show their embedded JPEG
+# preview only, which keeps the whole dependency tree permissive
+# (MIT/Apache/BSD/Zlib/MPL) and the library about 5 MB smaller.
+lichtkasten-core = { path = "../../../lichtkasten/crates/lichtkasten-core", default-features = false }
 uniffi = { version = "0.32" }
 thiserror = "2"
 libc = "0.2"

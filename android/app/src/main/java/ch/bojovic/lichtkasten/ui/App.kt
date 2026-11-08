@@ -55,6 +55,7 @@ fun App(
     }
 
     var shareCandidates by remember { mutableStateOf<List<MediaItem>?>(null) }
+    var showLicenses by remember { mutableStateOf(false) }
 
     val actions = remember(state.items, state.selection) {
         ScreenActions(
@@ -73,10 +74,15 @@ fun App(
                 }
             },
             requestPermissions = { permissionLauncher.launch(mediaPermissions) },
+            licenses = { showLicenses = true },
         )
     }
 
     when {
+        showLicenses -> {
+            BackHandler { showLicenses = false }
+            LicensesScreen(onBack = { showLicenses = false })
+        }
         state.access == MediaAccess.Denied || state.access == MediaAccess.Unknown -> {
             PermissionScreen(denied = state.access == MediaAccess.Denied, onRequest = actions.requestPermissions)
         }
@@ -117,4 +123,5 @@ class ScreenActions(
     val share: (List<MediaItem>) -> Unit,
     val delete: (List<MediaItem>) -> Unit,
     val requestPermissions: () -> Unit,
+    val licenses: () -> Unit,
 )

@@ -24,6 +24,9 @@
     <string name="info">Info</string>
     <string name="back">Back</string>
     <string name="select_first">Select something first</string>
+    <string name="more">More</string>
+    <string name="licenses">Licenses</string>
+    <string name="licenses_about">Lichtkasten %1$s. No network access, no accounts, no tracking. Built with the open-source software listed below.</string>
 
     <!-- Dialogs -->
     <string name="share_question">Share %1$d files?</string>

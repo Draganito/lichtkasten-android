@@ -21,6 +21,9 @@
     <string name="delete">Löschen</string>
     <string name="info">Info</string>
     <string name="back">Zurück</string>
+    <string name="more">Mehr</string>
+    <string name="licenses">Lizenzen</string>
+    <string name="licenses_about">Lichtkasten %1$s. Kein Netzzugriff, keine Konten, kein Tracking. Gebaut mit der unten aufgeführten Open-Source-Software.</string>
     <string name="select_first">Zuerst etwas auswählen</string>
 
     <string name="share_question">%1$d Dateien teilen?</string>
