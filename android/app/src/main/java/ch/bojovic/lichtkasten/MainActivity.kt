@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
                     state = state,
                     vm = vm,
                     mediaPermissions = mediaPermissions(),
-                    onPermissionsResult = { vm.onAccess(checkAccess()) },
+                    onPermissionsResult = { vm.onAccess(checkAccess(), afterRequest = true) },
                 )
             }
         }

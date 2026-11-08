@@ -101,7 +101,7 @@ fun App(
             LicensesScreen(onBack = { showLicenses = false })
         }
         state.access == MediaAccess.Denied || state.access == MediaAccess.Unknown -> {
-            PermissionScreen(denied = state.access == MediaAccess.Denied, onRequest = actions.requestPermissions)
+            PermissionScreen(denied = state.permissionRefused, onRequest = actions.requestPermissions)
         }
         state.viewerIndex != null -> {
             BackHandler { vm.closeViewer() }

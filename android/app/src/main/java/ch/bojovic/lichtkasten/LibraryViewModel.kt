@@ -20,6 +20,8 @@ enum class MediaAccess { Unknown, Denied, Partial, Full }
 
 data class LibraryState(
     val access: MediaAccess = MediaAccess.Unknown,
+    /** The user answered a permission request with "don't allow" at least once this session. */
+    val permissionRefused: Boolean = false,
     val loading: Boolean = false,
     val items: List<MediaItem> = emptyList(),
     val selection: SelectionState = SelectionState(),
@@ -54,10 +56,19 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Called by the Activity whenever the permission state is (re)checked. */
-    fun onAccess(access: MediaAccess) {
+    /**
+     * Called by the Activity whenever the permission state is (re)checked.
+     * [afterRequest] marks a check that follows the system dialog: a
+     * Denied result there is a refusal and unlocks the settings hint.
+     */
+    fun onAccess(access: MediaAccess, afterRequest: Boolean = false) {
         val before = _state.value.access
-        _state.update { it.copy(access = access) }
+        _state.update {
+            it.copy(
+                access = access,
+                permissionRefused = it.permissionRefused || (afterRequest && access == MediaAccess.Denied),
+            )
+        }
         if (access == MediaAccess.Denied || access == MediaAccess.Unknown) {
             observeJob?.cancel()
             observeJob = null
