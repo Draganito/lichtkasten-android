@@ -52,6 +52,8 @@
     <string name="size_px">%1$d px</string>
     <string name="crop_save">Save copy</string>
     <string name="export_done">Saved to Pictures/Lichtkasten (%1$d × %2$d)</string>
+    <string name="export_done_lossless">Saved losslessly to Pictures/Lichtkasten (%1$d × %2$d)</string>
+    <string name="crop_lossless_note">Original keeps the JPEG data as they are, no re-encoding. The frame snaps to the block grid (up to 8 px).</string>
     <string name="export_failed">Could not save</string>
     <string name="export_too_large">Not enough memory for this size</string>
     <string name="crop_raw_note">RAW and TIFF are exported from the embedded preview, at most %1$d px.</string>

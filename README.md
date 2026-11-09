@@ -23,9 +23,13 @@ which also provides the Rust core this app uses for TIFF, RAW and metadata.
 - **Crop & resize** in the viewer: free or fixed aspect (1:1, 4:3, 3:2,
   16:9, either orientation), drag corners, edges or the whole frame; output
   at original size or shrunk to 2048 / 1024 / 512 px on the long edge. The
-  result is a *new* JPEG (quality 92) in `Pictures/Lichtkasten`; the
-  original is never modified. The decode happens once, at the output size,
-  so even a 50 MP source needs no more memory than the picture you keep.
+  result is a *new* file in `Pictures/Lichtkasten`; the original is never
+  modified. A JPEG cropped at original size is **not re-encoded**: the Rust
+  core copies the DCT blocks of the region (jpegtran-style, via
+  libjpeg-turbo), so the pixels are exactly the source's; the frame snaps
+  to the 8/16 px block grid for that (at most 8 px). Everything else is
+  decoded once, at the output size, and written as JPEG quality 92, so even
+  a 50 MP source needs no more memory than the picture you keep.
 - **Select** (or long-press) for multi-select; **All** / **None**; share and
   permanently delete the selection. Sharing asks "Share N files?" first;
   deleting goes through the system's own confirmation. There is no trash.

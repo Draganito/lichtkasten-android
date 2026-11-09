@@ -47,6 +47,8 @@
     <string name="size_px">%1$d px</string>
     <string name="crop_save">Kopie speichern</string>
     <string name="export_done">Gespeichert in Pictures/Lichtkasten (%1$d × %2$d)</string>
+    <string name="export_done_lossless">Verlustfrei gespeichert in Pictures/Lichtkasten (%1$d × %2$d)</string>
+    <string name="crop_lossless_note">Original übernimmt die JPEG-Daten unverändert, ohne Neukomprimierung. Der Rahmen rastet auf das Blockraster ein (bis 8 px).</string>
     <string name="export_failed">Konnte nicht speichern</string>
     <string name="export_too_large">Nicht genug Speicher für diese Größe</string>
     <string name="crop_raw_note">RAW und TIFF werden aus der eingebetteten Vorschau exportiert, höchstens %1$d px.</string>

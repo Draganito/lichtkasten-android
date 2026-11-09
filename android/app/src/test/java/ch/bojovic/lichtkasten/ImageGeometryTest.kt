@@ -126,6 +126,48 @@ class ImageGeometryTest {
         assertEquals(0.75f, top.top, eps)
     }
 
+    /** Where stored pixel (x, y) lands after rotating a w×h picture clockwise. */
+    private fun rotatePoint(x: Int, y: Int, w: Int, h: Int, rotation: Int): Pair<Int, Int> = when (rotation) {
+        90 -> (h - 1 - y) to x
+        180 -> (w - 1 - x) to (h - 1 - y)
+        270 -> y to (w - 1 - x)
+        else -> x to y
+    }
+
+    @Test
+    fun toStoredMatchesBruteForceRotation() {
+        val w = 7
+        val h = 5
+        for (rotation in listOf(0, 90, 180, 270)) {
+            val (ow, oh) = ImageGeometry.orientedSize(w, h, rotation)
+            // Every oriented box up to 3x3 at every position.
+            for (t in 0 until oh) for (l in 0 until ow) for (bh in 1..3) for (bw in 1..3) {
+                val r = l + bw
+                val b = t + bh
+                if (r > ow || b > oh) continue
+                val box = IntBox(l, t, r, b)
+                // Stored pixels whose rotated position falls into the box.
+                var minX = Int.MAX_VALUE; var minY = Int.MAX_VALUE; var maxX = -1; var maxY = -1
+                for (y in 0 until h) for (x in 0 until w) {
+                    val (ox, oy) = rotatePoint(x, y, w, h, rotation)
+                    if (ox in l until r && oy in t until b) {
+                        minX = minOf(minX, x); minY = minOf(minY, y); maxX = maxOf(maxX, x); maxY = maxOf(maxY, y)
+                    }
+                }
+                val expected = IntBox(minX, minY, maxX + 1, maxY + 1)
+                assertEquals("rotation $rotation box $box", expected, ImageGeometry.toStored(box, w, h, rotation))
+            }
+        }
+    }
+
+    @Test
+    fun orientedSizeSwapsForQuarterTurns() {
+        assertEquals(3000 to 4000, ImageGeometry.orientedSize(4000, 3000, 90))
+        assertEquals(3000 to 4000, ImageGeometry.orientedSize(4000, 3000, 270))
+        assertEquals(4000 to 3000, ImageGeometry.orientedSize(4000, 3000, 180))
+        assertEquals(4000 to 3000, ImageGeometry.orientedSize(4000, 3000, 0))
+    }
+
     @Test
     fun moveStopsAtThePictureEdge() {
         val r = CropRect(0.2f, 0.2f, 0.6f, 0.6f)

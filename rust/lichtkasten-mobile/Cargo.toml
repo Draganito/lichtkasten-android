@@ -1,7 +1,7 @@
 [package]
 name = "lichtkasten-mobile"
 # The app's version; android/app/build.gradle.kts reads it from here.
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 license = "MIT"
 authors = ["Dragan Bojovic"]
@@ -29,7 +29,9 @@ bindgen = ["uniffi/cli"]
 # Without the `rawler` feature (LGPL): RAW files show their embedded JPEG
 # preview only, which keeps the whole dependency tree permissive
 # (MIT/Apache/BSD/Zlib/MPL) and the library about 5 MB smaller.
-lichtkasten-core = { path = "../../../lichtkasten/crates/lichtkasten-core", default-features = false }
+# `lossless-jpeg`: jpegtran-style cropping of JPEGs without re-encoding
+# (mozjpeg-sys, IJG/BSD/Zlib, built from C by `cc`).
+lichtkasten-core = { path = "../../../lichtkasten/crates/lichtkasten-core", default-features = false, features = ["lossless-jpeg"] }
 uniffi = { version = "0.32" }
 thiserror = "2"
 libc = "0.2"

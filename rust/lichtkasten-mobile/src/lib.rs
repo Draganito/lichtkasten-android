@@ -10,11 +10,12 @@
 uniffi::setup_scaffolding!();
 
 use std::fs::File;
-use std::io::{BufReader, Seek, SeekFrom};
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::os::fd::{FromRawFd, OwnedFd};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use lichtkasten_core::decode::{self, DecodeLimits};
+use lichtkasten_core::jpeg_lossless;
 use lichtkasten_core::meta;
 
 const LIMITS: DecodeLimits = DecodeLimits::MOBILE;
@@ -125,6 +126,55 @@ pub fn read_metadata(fd: i32) -> Result<Metadata, DecodeError> {
     })
 }
 
+/// A region in the JPEG's stored (unrotated) pixel coordinates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Record)]
+pub struct CropBox {
+    pub left: u32,
+    pub top: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// A complete JPEG file plus the rectangle of the source it really holds
+/// (the requested origin snapped to the 8/16 px block grid).
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct LosslessCrop {
+    pub jpeg: Vec<u8>,
+    pub rect: CropBox,
+}
+
+/// Cut `rect` out of the JPEG behind `fd` without decoding it: the DCT
+/// blocks are copied, so the pixels are exactly the source's. The origin
+/// moves to the nearest block boundary (at most half a block); the far
+/// edges stay. Only the ICC profile is carried over, no EXIF or XMP; the
+/// stored orientation is unchanged, so the caller must write the source's
+/// Orientation tag. Fails with `Unsupported` for arithmetic-coded or
+/// otherwise unusual files and with `TooLarge` beyond the memory budget;
+/// the caller then falls back to a re-encode. Takes ownership of `fd`.
+#[uniffi::export]
+pub fn crop_jpeg_lossless(fd: i32, rect: CropBox) -> Result<LosslessCrop, DecodeError> {
+    let file = take_fd(fd)?;
+    guarded(move || {
+        let mut file = file;
+        let len = file.metadata()?.len();
+        if len > LIMITS.max_file {
+            return Err(DecodeError::TooLarge { msg: format!("{len} bytes") });
+        }
+        file.seek(SeekFrom::Start(0))?;
+        let mut data = Vec::with_capacity(len as usize);
+        file.read_to_end(&mut data)?;
+        let out = jpeg_lossless::crop_lossless(
+            &data,
+            jpeg_lossless::CropBox { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+            &LIMITS,
+        )?;
+        Ok(LosslessCrop {
+            jpeg: out.jpeg,
+            rect: CropBox { left: out.rect.left, top: out.rect.top, width: out.rect.width, height: out.rect.height },
+        })
+    })
+}
+
 fn rows(v: Vec<(String, String)>) -> Vec<MetaRow> {
     v.into_iter().map(|(key, value)| MetaRow { key, value }).collect()
 }
@@ -203,5 +253,31 @@ mod tests {
         let fd = fd_of(tmp);
         drop(unsafe { OwnedFd::from_raw_fd(fd) });
         let _ = read_metadata(fd); // must not abort
+    }
+
+    #[test]
+    fn lossless_crop_over_a_descriptor() {
+        use image::{ImageBuffer, Luma};
+        use std::io::Write;
+        let img: ImageBuffer<Luma<u8>, Vec<u8>> =
+            ImageBuffer::from_fn(96, 64, |x, y| Luma([((x * 5) ^ (y * 3)) as u8]));
+        let mut jpeg = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 90)
+            .encode(img.as_raw(), 96, 64, image::ExtendedColorType::L8)
+            .unwrap();
+        let mut tmp = tempfile::tempfile().unwrap();
+        tmp.write_all(&jpeg).unwrap();
+
+        let out = crop_jpeg_lossless(fd_of(tmp), CropBox { left: 13, top: 8, width: 40, height: 24 }).unwrap();
+        assert_eq!(out.rect, CropBox { left: 16, top: 8, width: 37, height: 24 });
+        let full = image::load_from_memory(&jpeg).unwrap().to_luma8();
+        let cut = image::load_from_memory(&out.jpeg).unwrap().to_luma8();
+        assert_eq!((cut.width(), cut.height()), (37, 24));
+        for y in 0..24 {
+            for x in 0..37 {
+                assert_eq!(cut.get_pixel(x, y), full.get_pixel(x + 16, y + 8));
+            }
+        }
+        assert!(matches!(crop_jpeg_lossless(-1, CropBox { left: 0, top: 0, width: 1, height: 1 }), Err(DecodeError::Io { .. })));
     }
 }

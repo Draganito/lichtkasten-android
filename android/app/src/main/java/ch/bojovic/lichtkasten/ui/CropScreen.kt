@@ -225,9 +225,14 @@ fun CropScreen(
                     Text(stringResource(R.string.crop_reset))
                 }
             }
-            if (item.needsRust) {
+            val note = when {
+                item.needsRust -> stringResource(R.string.crop_raw_note, ImageExport.RUST_MAX_EDGE)
+                ImageExport.isLosslessCandidate(item, SIZES[sizeIndex]) -> stringResource(R.string.crop_lossless_note)
+                else -> null
+            }
+            if (note != null) {
                 Text(
-                    stringResource(R.string.crop_raw_note, ImageExport.RUST_MAX_EDGE),
+                    note,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

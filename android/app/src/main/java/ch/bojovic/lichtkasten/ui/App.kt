@@ -123,7 +123,8 @@ fun App(
                     cropFor = null
                     // MediaStore's observer reloads the grid; the new file sorts next to its source.
                     scope.launch {
-                        snackbar.showSnackbar(context.getString(R.string.export_done, saved.width, saved.height))
+                        val text = if (saved.lossless) R.string.export_done_lossless else R.string.export_done
+                        snackbar.showSnackbar(context.getString(text, saved.width, saved.height))
                     }
                 },
             )

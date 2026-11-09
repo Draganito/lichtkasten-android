@@ -3,13 +3,16 @@ package ch.bojovic.lichtkasten.media
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.graphics.Rect
 import android.media.ExifInterface
 import android.net.Uri
 import android.provider.MediaStore
 import ch.bojovic.lichtkasten.Logs
+import ch.bojovic.lichtkasten.core.CropBox
 import ch.bojovic.lichtkasten.core.DecodeException
+import ch.bojovic.lichtkasten.core.cropJpegLossless
 import ch.bojovic.lichtkasten.core.decodeImage
 import ch.bojovic.lichtkasten.core.readMetadata
 import java.io.IOException
@@ -22,7 +25,8 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 sealed interface ExportResult {
-    data class Saved(val uri: Uri, val width: Int, val height: Int) : ExportResult
+    /** [lossless]: the JPEG blocks were copied, nothing was re-encoded. */
+    data class Saved(val uri: Uri, val width: Int, val height: Int, val lossless: Boolean) : ExportResult
     data class Failed(val reason: Reason) : ExportResult
 
     enum class Reason { Decode, TooLarge, Write }
@@ -35,9 +39,11 @@ sealed interface ExportResult {
  * its source); location, camera, serial numbers and everything else stay
  * behind.
  *
- * The decode produces exactly one bitmap at the final size: ImageDecoder
- * applies the EXIF orientation, scales the whole picture and keeps only the
- * crop, so memory is bounded by the output, not by the source.
+ * A JPEG cropped at its original size is not decoded at all: the Rust core
+ * copies the DCT blocks of the region (jpegtran-style), so the pixels stay
+ * exactly what they were. Everything else is decoded exactly once at the
+ * final size: ImageDecoder applies the EXIF orientation, scales the whole
+ * picture and keeps only the crop, so memory is bounded by the output.
  */
 object ImageExport {
 
@@ -47,9 +53,19 @@ object ImageExport {
     /** Rust decodes a RAW/TIFF preview up to this long edge; larger exports of those are not offered. */
     const val RUST_MAX_EDGE = 4096
 
+    /** Whether [export] at original size would copy JPEG blocks instead of re-encoding. */
+    fun isLosslessCandidate(item: MediaItem, targetEdge: Int): Boolean =
+        targetEdge == 0 && !item.isVideo && !item.needsRust &&
+            (item.mimeType == "image/jpeg" || MediaKinds.extensionOf(item.displayName) in setOf("jpg", "jpeg"))
+
     suspend fun export(context: Context, item: MediaItem, crop: CropRect, targetEdge: Int): ExportResult =
         withContext(Dispatchers.IO) {
             val app = context.applicationContext
+            if (isLosslessCandidate(item, targetEdge)) {
+                val lossless = ThumbCache.slots.withPermit { cropLossless(app, item, crop) }
+                if (lossless != null) return@withContext lossless
+                // Unusual JPEG (arithmetic, flipped orientation, over budget): re-encode instead.
+            }
             val bitmap = try {
                 ThumbCache.slots.withPermit {
                     if (item.needsRust) decodeRust(app, item, crop, targetEdge) else decodeAndroid(app, item, crop, targetEdge)
@@ -59,11 +75,77 @@ object ImageExport {
                 return@withContext ExportResult.Failed(ExportResult.Reason.TooLarge)
             } ?: return@withContext ExportResult.Failed(ExportResult.Reason.Decode)
             try {
-                write(app, item, bitmap)
+                write(app, item, bitmap.width, bitmap.height, ExifInterface.ORIENTATION_NORMAL, lossless = false) { out ->
+                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)) throw IOException("compress")
+                }
             } finally {
                 bitmap.recycle()
             }
         }
+
+    // ---- lossless ---------------------------------------------------------
+
+    /**
+     * The crop is framed on the displayed (rotated) picture; the JPEG stores
+     * the unrotated pixels, so the box is mapped back and the source's
+     * Orientation tag is written to the copy. Returns null when this file
+     * cannot take the lossless route, so the caller re-encodes.
+     */
+    private fun cropLossless(context: Context, item: MediaItem, crop: CropRect): ExportResult? {
+        val header = readJpegHeader(context, item) ?: return null
+        val rotation = when (header.orientation) {
+            ExifInterface.ORIENTATION_UNDEFINED, ExifInterface.ORIENTATION_NORMAL -> 0
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270
+            else -> return null // mirrored: let the decoder sort it out
+        }
+        val (ow, oh) = ImageGeometry.orientedSize(header.width, header.height, rotation)
+        val stored = ImageGeometry.toStored(crop.toPixels(ow, oh), header.width, header.height, rotation)
+        if (stored.width <= 0 || stored.height <= 0) return null
+
+        val fd = try {
+            context.contentResolver.openFileDescriptor(item.uri, "r")?.detachFd()
+        } catch (e: IOException) {
+            null
+        } catch (e: SecurityException) {
+            null
+        } ?: return null
+        // Rust owns `fd` and closes it.
+        val cut = try {
+            cropJpegLossless(fd, CropBox(stored.left.toUInt(), stored.top.toUInt(), stored.width.toUInt(), stored.height.toUInt()))
+        } catch (e: DecodeException) {
+            Logs.file { "lossless crop not possible for ${item.displayName}: ${e.message}" }
+            return null
+        }
+        if (cut.jpeg.isEmpty()) return null
+        val (w, h) = ImageGeometry.orientedSize(cut.rect.width.toInt(), cut.rect.height.toInt(), rotation)
+        val orientationTag = if (rotation == 0) ExifInterface.ORIENTATION_NORMAL else header.orientation
+        return write(context, item, w, h, orientationTag, lossless = true) { out -> out.write(cut.jpeg) }
+    }
+
+    private class JpegHeader(val width: Int, val height: Int, val orientation: Int)
+
+    /** Stored dimensions and the raw EXIF Orientation value, without decoding pixels. */
+    private fun readJpegHeader(context: Context, item: MediaItem): JpegHeader? {
+        return try {
+            val size = context.contentResolver.openFileDescriptor(item.uri, "r")?.use { pfd ->
+                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFileDescriptor(pfd.fileDescriptor, null, opts)
+                if (opts.outWidth <= 0 || opts.outHeight <= 0 || opts.outMimeType != "image/jpeg") null
+                else opts.outWidth to opts.outHeight
+            } ?: return null
+            val orientation = context.contentResolver.openFileDescriptor(item.uri, "r")?.use { pfd ->
+                ExifInterface(pfd.fileDescriptor)
+                    .getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+            } ?: return null
+            JpegHeader(size.first, size.second, orientation)
+        } catch (e: IOException) {
+            null
+        } catch (e: SecurityException) {
+            null
+        }
+    }
 
     // ---- decode -----------------------------------------------------------
 
@@ -151,7 +233,15 @@ object ImageExport {
 
     // ---- write ------------------------------------------------------------
 
-    private fun write(context: Context, item: MediaItem, bitmap: Bitmap): ExportResult {
+    private fun write(
+        context: Context,
+        item: MediaItem,
+        width: Int,
+        height: Int,
+        orientationTag: Int,
+        lossless: Boolean,
+        body: (java.io.OutputStream) -> Unit,
+    ): ExportResult {
         val resolver = context.contentResolver
         val base = item.displayName.substringBeforeLast('.').ifBlank { "image" }
         val values = ContentValues().apply {
@@ -171,12 +261,10 @@ object ImageExport {
         } ?: return ExportResult.Failed(ExportResult.Reason.Write)
 
         try {
-            resolver.openOutputStream(uri, "w")?.use { out ->
-                if (!bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)) throw IOException("compress")
-            } ?: throw IOException("open")
-            writeExif(context, item, uri, bitmap.width, bitmap.height)
+            resolver.openOutputStream(uri, "w")?.use(body) ?: throw IOException("open")
+            writeExif(context, item, uri, orientationTag)
             resolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
-            return ExportResult.Saved(uri, bitmap.width, bitmap.height)
+            return ExportResult.Saved(uri, width, height, lossless)
         } catch (e: IOException) {
             Logs.file { "export write failed: ${e.message}" }
         } catch (e: SecurityException) {
@@ -186,15 +274,16 @@ object ImageExport {
         return ExportResult.Failed(ExportResult.Reason.Write)
     }
 
-    /** Capture time from the source, orientation 1 (pixels are upright), nothing else. */
-    private fun writeExif(context: Context, item: MediaItem, uri: Uri, width: Int, height: Int) {
+    /**
+     * Capture time from the source, the orientation the pixels need (1 after
+     * a decode, the source's tag after a lossless copy), nothing else.
+     */
+    private fun writeExif(context: Context, item: MediaItem, uri: Uri, orientationTag: Int) {
         val captured = captureTime(context, item)
         try {
             context.contentResolver.openFileDescriptor(uri, "rw")?.use { pfd ->
                 val exif = ExifInterface(pfd.fileDescriptor)
-                exif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
-                exif.setAttribute(ExifInterface.TAG_IMAGE_WIDTH, width.toString())
-                exif.setAttribute(ExifInterface.TAG_IMAGE_LENGTH, height.toString())
+                exif.setAttribute(ExifInterface.TAG_ORIENTATION, orientationTag.toString())
                 exif.setAttribute(ExifInterface.TAG_SOFTWARE, "Lichtkasten")
                 captured?.let { (date, offset, subsec) ->
                     exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, date)

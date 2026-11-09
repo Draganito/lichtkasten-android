@@ -43,6 +43,28 @@ object ImageGeometry {
     /** Upper bound on pixels of an exported bitmap: 32 MP, 128 MB as ARGB. */
     const val MAX_OUT_PIXELS = 32L * 1024 * 1024
 
+    /** Width and height as displayed after rotating stored pixels by [rotation] degrees clockwise. */
+    fun orientedSize(storedWidth: Int, storedHeight: Int, rotation: Int): Pair<Int, Int> =
+        if (rotation == 90 || rotation == 270) storedHeight to storedWidth else storedWidth to storedHeight
+
+    /**
+     * Maps a box in oriented (displayed) pixels back to the stored pixels
+     * of a file whose display rotation is [rotation] degrees clockwise
+     * (0/90/180/270, the EXIF/MediaStore convention). Flipped orientations
+     * are not handled here; callers skip them.
+     */
+    fun toStored(box: IntBox, storedWidth: Int, storedHeight: Int, rotation: Int): IntBox = when (rotation) {
+        90 -> IntBox(box.top, storedHeight - box.right, box.bottom, storedHeight - box.left)
+        180 -> IntBox(storedWidth - box.right, storedHeight - box.bottom, storedWidth - box.left, storedHeight - box.top)
+        270 -> IntBox(storedWidth - box.bottom, box.left, storedWidth - box.top, box.right)
+        else -> box
+    }.let {
+        IntBox(
+            it.left.coerceIn(0, storedWidth), it.top.coerceIn(0, storedHeight),
+            it.right.coerceIn(0, storedWidth), it.bottom.coerceIn(0, storedHeight),
+        )
+    }
+
     /**
      * Factor (≤ 1) to scale the whole picture by so that the crop's long
      * edge becomes [targetEdge] (0 = keep the original size) and the crop
