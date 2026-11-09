@@ -1,5 +1,8 @@
 package ch.bojovic.lichtkasten.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -13,9 +16,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,6 +43,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,20 +52,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ch.bojovic.lichtkasten.LibraryState
 import ch.bojovic.lichtkasten.LibraryViewModel
 import ch.bojovic.lichtkasten.MediaAccess
 import ch.bojovic.lichtkasten.R
+import ch.bojovic.lichtkasten.media.GridRow
 import ch.bojovic.lichtkasten.media.MediaItem
 import ch.bojovic.lichtkasten.media.RustRequest
+import ch.bojovic.lichtkasten.media.Sections
 import ch.bojovic.lichtkasten.media.ThumbRequest
 import coil3.compose.AsyncImage
+import java.time.Month
+import java.time.format.TextStyle
+import java.util.Locale
+import kotlinx.coroutines.delay
 
 /**
  * Thumbnail size tiers. Requests are rounded up to one of these so a pinch
@@ -170,32 +185,128 @@ fun GridScreen(
                     val thumbPx = remember(cellDp, screenWidthPx, density) {
                         thumbTier(adaptiveCellPx(screenWidthPx, with(density) { cellDp.dp.roundToPx() }))
                     }
-                    LazyVerticalGrid(
-                        state = gridState,
-                        columns = GridCells.Adaptive(minSize = cellDp.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pinchToScale(onScale = vm::scaleCells, onEnd = vm::persistCellSize),
-                    ) {
-                        itemsIndexed(
-                            state.items,
-                            key = { _, item -> item.id },
-                            contentType = { _, item -> if (item.isVideo) 1 else 0 },
-                        ) { index, item ->
-                            GridCell(
-                                item = item,
-                                thumbPx = thumbPx,
-                                selected = item.id in selection.ids,
-                                selecting = selection.active,
-                                onClick = { if (selection.active) vm.toggle(item) else vm.openViewer(index) },
-                                onLongClick = { vm.toggle(item) },
-                            )
+                    val rows = state.sections.rows
+                    Box(Modifier.fillMaxSize()) {
+                        LazyVerticalGrid(
+                            state = gridState,
+                            columns = GridCells.Adaptive(minSize = cellDp.dp),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pinchToScale(onScale = vm::scaleCells, onEnd = vm::persistCellSize),
+                        ) {
+                            itemsIndexed(
+                                rows,
+                                key = { _, row -> rowKey(row) },
+                                span = { _, row -> if (row is GridRow.Header) GridItemSpan(maxLineSpan) else GridItemSpan(1) },
+                                contentType = { _, row ->
+                                    when (row) {
+                                        is GridRow.Header -> 2
+                                        is GridRow.Cell -> if (row.item.isVideo) 1 else 0
+                                    }
+                                },
+                            ) { rowIndex, row ->
+                                when (row) {
+                                    is GridRow.Header -> MonthHeader(row, first = rowIndex == 0)
+                                    is GridRow.Cell -> {
+                                        val item = row.item
+                                        GridCell(
+                                            item = item,
+                                            thumbPx = thumbPx,
+                                            selected = item.id in selection.ids,
+                                            selecting = selection.active,
+                                            onClick = { if (selection.active) vm.toggle(item) else vm.openViewer(row.index) },
+                                            onLongClick = { vm.toggle(item) },
+                                        )
+                                    }
+                                }
+                            }
                         }
+                        MonthOverlay(sections = state.sections, gridState = gridState, modifier = Modifier.align(Alignment.TopCenter))
                     }
                 }
             }
+        }
+    }
+}
+
+private fun rowKey(row: GridRow): Any = when (row) {
+    is GridRow.Header -> "h:${row.year}-${row.month}"
+    is GridRow.Cell -> row.item.id
+}
+
+/** "November" large and light, "2026" small and quiet. Nothing else. */
+@Composable
+private fun MonthHeader(header: GridRow.Header, first: Boolean) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 14.dp, end = 14.dp, top = if (first) 6.dp else 26.dp, bottom = 10.dp),
+    ) {
+        MonthLabel(header)
+    }
+}
+
+@Composable
+private fun MonthLabel(header: GridRow.Header, tint: Color = MaterialTheme.colorScheme.onBackground) {
+    val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
+    val month = remember(header, locale) {
+        if (header.month == 0) null else Month.of(header.month).getDisplayName(TextStyle.FULL_STANDALONE, locale)
+    }
+    Text(
+        month ?: stringResource(R.string.month_undated),
+        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Light),
+        color = tint,
+        maxLines = 1,
+    )
+    if (header.month != 0) {
+        Text(
+            header.year.toString(),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * The month of the first visible picture, floating under the app bar on a
+ * short black gradient. Shown while the grid moves and for a moment after,
+ * and only when that month's own header is not already at the top. Reads
+ * layout info only; decodes nothing.
+ */
+@Composable
+private fun MonthOverlay(sections: Sections, gridState: LazyGridState, modifier: Modifier = Modifier) {
+    val header by remember(sections) {
+        derivedStateOf {
+            val first = gridState.layoutInfo.visibleItemsInfo.firstOrNull() ?: return@derivedStateOf null
+            val row = sections.rows.getOrNull(first.index) ?: return@derivedStateOf null
+            if (row is GridRow.Header) null else sections.headerForRow(first.index)
+        }
+    }
+    var recentlyScrolled by remember { mutableStateOf(false) }
+    LaunchedEffect(gridState.isScrollInProgress) {
+        if (gridState.isScrollInProgress) {
+            recentlyScrolled = true
+        } else {
+            delay(1200)
+            recentlyScrolled = false
+        }
+    }
+    AnimatedVisibility(
+        visible = header != null && recentlyScrolled,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = modifier,
+    ) {
+        val shown = header ?: return@AnimatedVisibility
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.78f), Color.Transparent)))
+                .padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 28.dp),
+        ) {
+            MonthLabel(shown, tint = Color.White)
         }
     }
 }

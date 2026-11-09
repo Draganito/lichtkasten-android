@@ -11,6 +11,7 @@
     <string name="perm_partial_more">Mehr auswählen</string>
 
     <string name="grid_empty">Keine Fotos oder Videos gefunden</string>
+    <string name="month_undated">Ohne Datum</string>
     <string name="grid_loading">Bibliothek wird gelesen…</string>
     <string name="select">Auswählen</string>
     <string name="select_all">Alle</string>
@@ -36,6 +37,19 @@
     <string name="video_badge">Video</string>
     <string name="load_failed">Konnte nicht geladen werden</string>
     <string name="image_description">Foto %1$s</string>
+
+    <string name="crop">Zuschneiden</string>
+    <string name="crop_title">Zuschneiden &amp; verkleinern</string>
+    <string name="crop_free">Frei</string>
+    <string name="crop_swap">Hoch-/Querformat tauschen</string>
+    <string name="crop_reset">Zurücksetzen</string>
+    <string name="size_original">Original</string>
+    <string name="size_px">%1$d px</string>
+    <string name="crop_save">Kopie speichern</string>
+    <string name="export_done">Gespeichert in Pictures/Lichtkasten (%1$d × %2$d)</string>
+    <string name="export_failed">Konnte nicht speichern</string>
+    <string name="export_too_large">Nicht genug Speicher für diese Größe</string>
+    <string name="crop_raw_note">RAW und TIFF werden aus der eingebetteten Vorschau exportiert, höchstens %1$d px.</string>
 
     <string name="info_title">Info</string>
     <string name="info_file">Datei</string>

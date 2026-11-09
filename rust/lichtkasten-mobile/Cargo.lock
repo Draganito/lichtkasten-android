@@ -480,7 +480,7 @@ dependencies = [
 
 [[package]]
 name = "lichtkasten-mobile"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "android_logger",
  "image",

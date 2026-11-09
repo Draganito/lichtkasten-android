@@ -24,6 +24,7 @@ import ch.bojovic.lichtkasten.LibraryViewModel
 import ch.bojovic.lichtkasten.MediaAccess
 import ch.bojovic.lichtkasten.R
 import ch.bojovic.lichtkasten.media.MediaItem
+import ch.bojovic.lichtkasten.media.Sections
 import ch.bojovic.lichtkasten.media.ThumbCache
 import coil3.SingletonImageLoader
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +73,7 @@ fun App(
 
     var shareCandidates by remember { mutableStateOf<List<MediaItem>?>(null) }
     var showLicenses by remember { mutableStateOf(false) }
+    var cropFor by remember { mutableStateOf<MediaItem?>(null) }
 
     val actions = remember(state.items, state.selection) {
         ScreenActions(
@@ -95,6 +97,7 @@ fun App(
             },
             requestPermissions = { permissionLauncher.launch(mediaPermissions) },
             licenses = { showLicenses = true },
+            crop = { item -> if (!item.isVideo) cropFor = item },
         )
     }
 
@@ -102,12 +105,28 @@ fun App(
     // the composition while the viewer or the licenses are shown, and must
     // come back where it was. Saveable, so it also survives process death.
     val gridState = rememberSaveable(saver = LazyGridState.Saver) { LazyGridState() }
-    ReturnToViewedItem(state.viewerIndex, gridState)
+    ReturnToViewedItem(state.viewerIndex, state.sections, gridState)
 
     when {
         showLicenses -> {
             BackHandler { showLicenses = false }
             LicensesScreen(onBack = { showLicenses = false })
+        }
+        cropFor != null -> {
+            val item = cropFor!!
+            BackHandler { cropFor = null }
+            CropScreen(
+                item = item,
+                snackbar = snackbar,
+                onClose = { cropFor = null },
+                onSaved = { saved ->
+                    cropFor = null
+                    // MediaStore's observer reloads the grid; the new file sorts next to its source.
+                    scope.launch {
+                        snackbar.showSnackbar(context.getString(R.string.export_done, saved.width, saved.height))
+                    }
+                },
+            )
         }
         state.access == MediaAccess.Denied || state.access == MediaAccess.Unknown -> {
             PermissionScreen(denied = state.permissionRefused, onRequest = actions.requestPermissions)
@@ -151,7 +170,8 @@ fun App(
  * user swiped on in the viewer and expects to land there).
  */
 @Composable
-private fun ReturnToViewedItem(viewerIndex: Int?, gridState: LazyGridState) {
+private fun ReturnToViewedItem(viewerIndex: Int?, sections: Sections, gridState: LazyGridState) {
+    // All in grid row indices (headers count), not item indices.
     var firstVisibleOnOpen by rememberSaveable { mutableStateOf(-1) }
     var lastVisibleOnOpen by rememberSaveable { mutableStateOf(-1) }
     var lastViewed by rememberSaveable { mutableStateOf(-1) }
@@ -164,9 +184,9 @@ private fun ReturnToViewedItem(viewerIndex: Int?, gridState: LazyGridState) {
             }
             lastViewed = viewerIndex
         } else if (lastViewed >= 0) {
-            val target = lastViewed
+            val targetRow = sections.rowForItem(lastViewed)
             lastViewed = -1
-            if (target !in firstVisibleOnOpen..lastVisibleOnOpen) gridState.scrollToItem(target)
+            if (targetRow !in firstVisibleOnOpen..lastVisibleOnOpen) gridState.scrollToItem(targetRow)
         }
     }
 }
@@ -177,4 +197,5 @@ class ScreenActions(
     val delete: (List<MediaItem>) -> Unit,
     val requestPermissions: () -> Unit,
     val licenses: () -> Unit,
+    val crop: (MediaItem) -> Unit,
 )

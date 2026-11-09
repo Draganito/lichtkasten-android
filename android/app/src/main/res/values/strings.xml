@@ -13,6 +13,7 @@
 
     <!-- Grid -->
     <string name="grid_empty">No photos or videos found</string>
+    <string name="month_undated">Undated</string>
     <string name="grid_loading">Reading library…</string>
     <string name="select">Select</string>
     <string name="select_all">All</string>
@@ -40,6 +41,20 @@
     <string name="video_badge">Video</string>
     <string name="load_failed">Could not load</string>
     <string name="image_description">Photo %1$s</string>
+
+    <!-- Crop -->
+    <string name="crop">Crop</string>
+    <string name="crop_title">Crop &amp; resize</string>
+    <string name="crop_free">Free</string>
+    <string name="crop_swap">Swap orientation</string>
+    <string name="crop_reset">Reset</string>
+    <string name="size_original">Original</string>
+    <string name="size_px">%1$d px</string>
+    <string name="crop_save">Save copy</string>
+    <string name="export_done">Saved to Pictures/Lichtkasten (%1$d × %2$d)</string>
+    <string name="export_failed">Could not save</string>
+    <string name="export_too_large">Not enough memory for this size</string>
+    <string name="crop_raw_note">RAW and TIFF are exported from the embedded preview, at most %1$d px.</string>
 
     <!-- Info sheet -->
     <string name="info_title">Info</string>

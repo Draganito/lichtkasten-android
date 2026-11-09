@@ -15,8 +15,17 @@ which also provides the Rust core this app uses for TIFF, RAW and metadata.
   (DCIM, Pictures, Download, SD card …), newest first. Updates itself when
   the library changes.
 - Pinch on the grid changes the thumbnail size; the size is remembered.
+- The grid is cut into months: a large, quiet heading ("November", "2026")
+  before the first picture of each month, and while you scroll, the current
+  month floats under the app bar.
 - Tap opens the viewer: swipe between pictures, pinch / double-tap to zoom,
   videos play inline (Media3, the codecs the system has).
+- **Crop & resize** in the viewer: free or fixed aspect (1:1, 4:3, 3:2,
+  16:9, either orientation), drag corners, edges or the whole frame; output
+  at original size or shrunk to 2048 / 1024 / 512 px on the long edge. The
+  result is a *new* JPEG (quality 92) in `Pictures/Lichtkasten`; the
+  original is never modified. The decode happens once, at the output size,
+  so even a 50 MP source needs no more memory than the picture you keep.
 - **Select** (or long-press) for multi-select; **All** / **None**; share and
   permanently delete the selection. Sharing asks "Share N files?" first;
   deleting goes through the system's own confirmation. There is no trash.
@@ -35,8 +44,11 @@ which also provides the Rust core this app uses for TIFF, RAW and metadata.
 
 - No `INTERNET` permission. No accounts, no analytics, no crash reporting.
 - Read access only (`READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`; Android 14's
-  "selected photos only" is supported). Writes happen only through the
-  system delete dialog.
+  "selected photos only" is supported). Existing files are changed only
+  through the system delete dialog. *Crop & resize* creates new files in the
+  app's own folder `Pictures/Lichtkasten` (MediaStore insert, which needs no
+  extra permission) and copies nothing from the original but its capture
+  time: no location, no camera model, no serial numbers, no thumbnails.
 - Backup is off. The only stored state is the grid size (SharedPreferences)
   and an app-private cache of thumbnails for every photo and video
   (`cacheDir/thumbs`, one 1024 px JPEG each, decoded by the app itself;

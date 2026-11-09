@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ch.bojovic.lichtkasten.media.MediaItem
 import ch.bojovic.lichtkasten.media.MediaStoreRepository
+import ch.bojovic.lichtkasten.media.Sections
 import ch.bojovic.lichtkasten.ui.SelectionState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -24,6 +25,8 @@ data class LibraryState(
     val permissionRefused: Boolean = false,
     val loading: Boolean = false,
     val items: List<MediaItem> = emptyList(),
+    /** [items] cut into month headers and cells, for the grid. */
+    val sections: Sections = Sections.EMPTY,
     val selection: SelectionState = SelectionState(),
     /** Grid cell size in dp; pinch changes it, SharedPreferences keeps it. */
     val cellDp: Float = DEFAULT_CELL_DP,
@@ -72,7 +75,9 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         if (access == MediaAccess.Denied || access == MediaAccess.Unknown) {
             observeJob?.cancel()
             observeJob = null
-            _state.update { it.copy(items = emptyList(), selection = SelectionState(), viewerIndex = null) }
+            _state.update {
+                it.copy(items = emptyList(), sections = Sections.EMPTY, selection = SelectionState(), viewerIndex = null)
+            }
             return
         }
         if (observeJob == null || before != access) startObserving()
@@ -89,6 +94,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _state.update { it.copy(loading = it.items.isEmpty()) }
             val items = repo.loadAll()
+            val sections = withContext(Dispatchers.Default) { Sections.build(items) }
             _state.update { s ->
                 val ids = items.mapTo(HashSet()) { it.id }
                 val viewer = s.viewerIndex?.let { idx ->
@@ -100,6 +106,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                 s.copy(
                     loading = false,
                     items = items,
+                    sections = sections,
                     selection = s.selection.retain(ids),
                     viewerIndex = viewer,
                 )

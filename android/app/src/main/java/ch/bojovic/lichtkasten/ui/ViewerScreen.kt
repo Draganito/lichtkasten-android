@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
@@ -120,6 +121,11 @@ fun ViewerScreen(
                 },
                 title = { Text(current.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
+                    if (!current.isVideo) {
+                        IconButton(onClick = { actions.crop(current) }) {
+                            Icon(painterResource(R.drawable.ic_crop), contentDescription = stringResource(R.string.crop))
+                        }
+                    }
                     IconButton(onClick = { actions.share(listOf(current)) }) {
                         Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.share))
                     }
@@ -144,16 +150,19 @@ fun ViewerScreen(
     }
 }
 
+/**
+ * The Coil model the viewer shows: twice the window's long edge gives
+ * headroom for the pinch zoom without decoding a 50 MP file at full size.
+ * The crop screen uses the same model, so it opens on the cached picture.
+ */
 @Composable
-private fun PhotoPage(item: MediaItem, onTap: () -> Unit) {
+internal fun rememberViewerModel(item: MediaItem): Any {
     val context = LocalContext.current
     val container = LocalWindowInfo.current.containerSize
-    // Twice the window's long edge gives headroom for the pinch zoom
-    // without decoding a 50 MP file at full size.
     val edgePx = remember(container) {
         (max(container.width, container.height) * 2).coerceIn(1024, 4096)
     }
-    val model = remember(item.cacheKey, edgePx) {
+    return remember(item.cacheKey, edgePx) {
         if (item.needsRust) {
             RustRequest(item, edgePx)
         } else {
@@ -165,6 +174,11 @@ private fun PhotoPage(item: MediaItem, onTap: () -> Unit) {
                 .build()
         }
     }
+}
+
+@Composable
+private fun PhotoPage(item: MediaItem, onTap: () -> Unit) {
+    val model = rememberViewerModel(item)
     ZoomableBox(onTap = onTap) {
         AsyncImage(
             model = model,
